@@ -695,17 +695,16 @@ ecma_op_container_set_weak (ecma_object_t *const key_p, /**< key object */
 
   if (property_p == NULL)
   {
-    ecma_property_value_t *value_p = ecma_create_named_data_property (key_p,
-                                                                      weak_refs_string_p,
-                                                                      ECMA_PROPERTY_CONFIGURABLE_WRITABLE,
-                                                                      &property_p);
+    property_p = ecma_create_named_data_property (key_p,
+                                                  weak_refs_string_p,
+                                                  ECMA_PROPERTY_CONFIGURABLE_WRITABLE);
     ECMA_CONVERT_DATA_PROPERTY_TO_INTERNAL_PROPERTY (property_p);
     refs_p = ecma_new_collection ();
-    ECMA_SET_INTERNAL_VALUE_POINTER (value_p->value, refs_p);
+    ECMA_SET_INTERNAL_VALUE_POINTER (property_p->u.value, refs_p);
   }
   else
   {
-    refs_p = ECMA_GET_INTERNAL_VALUE_POINTER (ecma_collection_t, (ECMA_PROPERTY_VALUE_PTR (property_p)->value));
+    refs_p = ECMA_GET_INTERNAL_VALUE_POINTER (ecma_collection_t, property_p->u.value);
   }
 
   const ecma_value_t container_value = ecma_make_object_value ((ecma_object_t *) container_p);
@@ -946,7 +945,7 @@ ecma_op_container_unref_weak (ecma_object_t *object_p, /**< this argument */
   JERRY_ASSERT (property_p != NULL);
 
   ecma_collection_t *refs_p = ECMA_GET_INTERNAL_VALUE_POINTER (ecma_collection_t,
-                                                               ECMA_PROPERTY_VALUE_PTR (property_p)->value);
+                                                               property_p->u.value);
   for (uint32_t i = 0; i < refs_p->item_count; i++)
   {
     if (refs_p->buffer_p[i] == ref_holder)
@@ -1026,9 +1025,8 @@ ecma_op_iterator_get_index (ecma_object_t *iter_obj_p)  /**< iterator object poi
   {
     ecma_string_t *prop_name_p = ecma_get_magic_string (LIT_INTERNAL_MAGIC_STRING_ITERATOR_NEXT_INDEX);
     ecma_property_t *property_p = ecma_find_named_property (iter_obj_p, prop_name_p);
-    ecma_property_value_t *value_p = ECMA_PROPERTY_VALUE_PTR (property_p);
 
-    return (uint32_t) (ecma_get_number_from_value (value_p->value));
+    return (uint32_t) (ecma_get_number_from_value (property_p->u.value));
   }
 
   return index;
@@ -1047,18 +1045,13 @@ ecma_op_iterator_set_index (ecma_object_t *iter_obj_p, /**< iterator object poin
        property is stored as an internal property */
     ecma_string_t *prop_name_p = ecma_get_magic_string (LIT_INTERNAL_MAGIC_STRING_ITERATOR_NEXT_INDEX);
     ecma_property_t *property_p = ecma_find_named_property (iter_obj_p, prop_name_p);
-    ecma_property_value_t *value_p;
 
     if (property_p == NULL)
     {
-      value_p = ecma_create_named_data_property (iter_obj_p, prop_name_p, ECMA_PROPERTY_FLAG_WRITABLE, &property_p);
-      value_p->value = ecma_make_uint32_value (index);
+      property_p = ecma_create_named_data_property (iter_obj_p, prop_name_p, ECMA_PROPERTY_FLAG_WRITABLE);
     }
-    else
-    {
-      value_p = ECMA_PROPERTY_VALUE_PTR (property_p);
-      value_p->value = ecma_make_uint32_value (index);
-    }
+
+    property_p->u.value = ecma_make_uint32_value (index);
   }
   else
   {

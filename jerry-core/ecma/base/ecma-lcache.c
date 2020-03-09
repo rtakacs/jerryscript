@@ -17,6 +17,7 @@
 #include "ecma-globals.h"
 #include "ecma-helpers.h"
 #include "ecma-lcache.h"
+#include "ecma-property-hashmap.h"
 #include "jcontext.h"
 
 /** \addtogroup ecma ECMA
@@ -61,10 +62,26 @@ ecma_lcache_invalidate_entry (ecma_lcache_hash_entry_t *entry_p) /**< entry to i
 {
   JERRY_ASSERT (entry_p != NULL);
   JERRY_ASSERT (entry_p->id != 0);
-  JERRY_ASSERT (entry_p->prop_p != NULL);
+  JERRY_ASSERT (entry_p->object_cp != JMEM_CP_NULL);
+  JERRY_ASSERT (entry_p->index != ECMA_PROPERTY_INDEX_INVALID);
 
   entry_p->id = 0;
-  ecma_set_property_lcached (entry_p->prop_p, false);
+
+  ecma_object_t *object_p = ECMA_GET_NON_NULL_POINTER (ecma_object_t, entry_p->object_cp);
+  ecma_property_t *property_list_p = ECMA_GET_NON_NULL_POINTER (ecma_property_t, object_p->u1.property_list_cp);
+
+#if ENABLED (JERRY_PROPRETY_HASHMAP)
+  if (property_list_p->type_flags == ECMA_PROPERTY_TYPE_HASHMAP)
+  {
+    ecma_property_hashmap_t *hashmap_p = (ecma_property_hashmap_t *) property_list_p;
+    property_list_p = ECMA_GET_NON_NULL_POINTER (ecma_property_t, hashmap_p->property_list_cp);
+  }
+#endif /* ENABLED (JERRY_PROPRETY_HASHMAP) */
+
+  ecma_property_t *property_start_p = ECMA_PROPERTY_LIST_START (property_list_p);
+  ecma_property_t *property_p = property_start_p + entry_p->index;
+
+  ecma_set_property_lcached (property_p, false);
 } /* ecma_lcache_invalidate_entry */
 
 /**
@@ -87,13 +104,15 @@ ecma_lcache_row_index (jmem_cpointer_t object_cp, /**< compressed pointer to obj
 void
 ecma_lcache_insert (const ecma_object_t *object_p, /**< object */
                     const jmem_cpointer_t name_cp, /**< property name */
-                    ecma_property_t *prop_p) /**< property */
+                    const ecma_property_index_t property_index, /**< property index */
+                    ecma_property_t *property_p) /**< property */
 {
   JERRY_ASSERT (object_p != NULL);
-  JERRY_ASSERT (prop_p != NULL && !ecma_is_property_lcached (prop_p));
-  JERRY_ASSERT (ECMA_PROPERTY_GET_TYPE (*prop_p) == ECMA_PROPERTY_TYPE_NAMEDDATA
-                || ECMA_PROPERTY_GET_TYPE (*prop_p) == ECMA_PROPERTY_TYPE_NAMEDACCESSOR
-                || ECMA_PROPERTY_GET_TYPE (*prop_p) == ECMA_PROPERTY_TYPE_INTERNAL);
+  JERRY_ASSERT (property_p != NULL && !ecma_is_property_lcached (property_p));
+  JERRY_ASSERT (property_index != ECMA_PROPERTY_INDEX_INVALID);
+  JERRY_ASSERT (ECMA_PROPERTY_GET_TYPE (property_p) == ECMA_PROPERTY_TYPE_NAMEDDATA
+                || ECMA_PROPERTY_GET_TYPE (property_p) == ECMA_PROPERTY_TYPE_NAMEDACCESSOR
+                || ECMA_PROPERTY_GET_TYPE (property_p) == ECMA_PROPERTY_TYPE_INTERNAL);
 
   jmem_cpointer_t object_cp;
 
@@ -121,15 +140,18 @@ ecma_lcache_insert (const ecma_object_t *object_p, /**< object */
   for (uint32_t i = 0; i < ECMA_LCACHE_HASH_ROW_LENGTH - 1; i++)
   {
     entry_p->id = entry_p[-1].id;
-    entry_p->prop_p = entry_p[-1].prop_p;
+    entry_p->object_cp = entry_p[-1].object_cp;
+    entry_p->index = entry_p[-1].index;
+
     entry_p--;
   }
 
 insert:
-  entry_p->prop_p = prop_p;
+  entry_p->object_cp = object_cp;
+  entry_p->index = property_index;
   entry_p->id = ECMA_LCACHE_CREATE_ID (object_cp, name_cp);
 
-  ecma_set_property_lcached (entry_p->prop_p, true);
+  ecma_set_property_lcached (property_p, true);
 } /* ecma_lcache_insert */
 
 /**
@@ -148,12 +170,12 @@ ecma_lcache_lookup (const ecma_object_t *object_p, /**< object */
   jmem_cpointer_t object_cp;
   ECMA_SET_NON_NULL_POINTER (object_cp, object_p);
 
-  ecma_property_t prop_name_type = ECMA_DIRECT_STRING_PTR;
+  uint8_t prop_name_type = ECMA_DIRECT_STRING_PTR;
   jmem_cpointer_t prop_name_cp;
 
   if (JERRY_UNLIKELY (ECMA_IS_DIRECT_STRING (prop_name_p)))
   {
-    prop_name_type = (ecma_property_t) ECMA_GET_DIRECT_STRING_TYPE (prop_name_p);
+    prop_name_type = (uint8_t) ECMA_GET_DIRECT_STRING_TYPE (prop_name_p);
     prop_name_cp = (jmem_cpointer_t) ECMA_GET_DIRECT_STRING_VALUE (prop_name_p);
   }
   else
@@ -169,10 +191,28 @@ ecma_lcache_lookup (const ecma_object_t *object_p, /**< object */
 
   do
   {
-    if (entry_p->id == id && JERRY_LIKELY (ECMA_PROPERTY_GET_NAME_TYPE (*entry_p->prop_p) == prop_name_type))
+    if (entry_p->id == id)
     {
-      JERRY_ASSERT (entry_p->prop_p != NULL && ecma_is_property_lcached (entry_p->prop_p));
-      return entry_p->prop_p;
+      ecma_object_t *obj_p = ECMA_GET_NON_NULL_POINTER (ecma_object_t, entry_p->object_cp);
+      ecma_property_t *property_list_p = ECMA_GET_NON_NULL_POINTER (ecma_property_t, obj_p->u1.property_list_cp);
+
+#if ENABLED (JERRY_PROPRETY_HASHMAP)
+      if (property_list_p->type_flags == ECMA_PROPERTY_TYPE_HASHMAP)
+      {
+        ecma_property_hashmap_t *hashmap_p = (ecma_property_hashmap_t *) property_list_p;
+        property_list_p = ECMA_GET_NON_NULL_POINTER (ecma_property_t, hashmap_p->property_list_cp);
+      }
+#endif /* ENABLED (JERRY_PROPRETY_HASHMAP) */
+
+      ecma_property_t *property_start_p = ECMA_PROPERTY_LIST_START (property_list_p);
+      ecma_property_t *property_p = property_start_p + entry_p->index;
+
+      JERRY_ASSERT (property_p != NULL && ecma_is_property_lcached (property_p));
+
+      if (JERRY_LIKELY (ECMA_PROPERTY_GET_NAME_TYPE (property_p) == prop_name_type))
+      {
+        return property_p;
+      }
     }
     entry_p++;
   }
@@ -186,32 +226,48 @@ ecma_lcache_lookup (const ecma_object_t *object_p, /**< object */
  */
 void
 ecma_lcache_invalidate (const ecma_object_t *object_p, /**< object */
-                        const jmem_cpointer_t name_cp, /**< property name */
-                        ecma_property_t *prop_p) /**< property */
+                        ecma_property_t *property_p) /**< property */
 {
   JERRY_ASSERT (object_p != NULL);
-  JERRY_ASSERT (prop_p != NULL && ecma_is_property_lcached (prop_p));
-  JERRY_ASSERT (ECMA_PROPERTY_GET_TYPE (*prop_p) == ECMA_PROPERTY_TYPE_NAMEDDATA
-                || ECMA_PROPERTY_GET_TYPE (*prop_p) == ECMA_PROPERTY_TYPE_NAMEDACCESSOR
-                || ECMA_PROPERTY_GET_TYPE (*prop_p) == ECMA_PROPERTY_TYPE_INTERNAL);
+  JERRY_ASSERT (property_p != NULL && ecma_is_property_lcached (property_p));
+  JERRY_ASSERT (ECMA_PROPERTY_GET_TYPE (property_p) == ECMA_PROPERTY_TYPE_NAMEDDATA
+                || ECMA_PROPERTY_GET_TYPE (property_p) == ECMA_PROPERTY_TYPE_NAMEDACCESSOR
+                || ECMA_PROPERTY_GET_TYPE (property_p) == ECMA_PROPERTY_TYPE_INTERNAL);
 
   jmem_cpointer_t object_cp;
   ECMA_SET_NON_NULL_POINTER (object_cp, object_p);
 
-  size_t row_index = ecma_lcache_row_index (object_cp, name_cp);
+  size_t row_index = ecma_lcache_row_index (object_cp, property_p->name_cp);
   ecma_lcache_hash_entry_t *entry_p = JERRY_CONTEXT (lcache) [row_index];
 
   while (true)
   {
     /* The property must be present. */
-    JERRY_ASSERT (entry_p - JERRY_CONTEXT (lcache) [row_index] < ECMA_LCACHE_HASH_ROW_LENGTH);
+    JERRY_ASSERT ((entry_p - JERRY_CONTEXT (lcache) [row_index]) < ECMA_LCACHE_HASH_ROW_LENGTH);
 
-    if (entry_p->id != 0 && entry_p->prop_p == prop_p)
+    if (entry_p->id != 0)
     {
-      JERRY_ASSERT (entry_p->id == ECMA_LCACHE_CREATE_ID (object_cp, name_cp));
+      ecma_object_t *obj_p = ECMA_GET_NON_NULL_POINTER (ecma_object_t, entry_p->object_cp);
+      ecma_property_t *property_list_p = ECMA_GET_NON_NULL_POINTER (ecma_property_t, obj_p->u1.property_list_cp);
 
-      ecma_lcache_invalidate_entry (entry_p);
-      return;
+#if ENABLED (JERRY_PROPRETY_HASHMAP)
+      if (property_list_p->type_flags == ECMA_PROPERTY_TYPE_HASHMAP)
+      {
+        ecma_property_hashmap_t *hashmap_p = (ecma_property_hashmap_t *) property_list_p;
+        property_list_p = ECMA_GET_NON_NULL_POINTER (ecma_property_t, hashmap_p->property_list_cp);
+      }
+#endif /* ENABLED (JERRY_PROPRETY_HASHMAP) */
+
+      ecma_property_t *property_start_p = ECMA_PROPERTY_LIST_START (property_list_p);
+      ecma_property_t *prop_p = property_start_p + entry_p->index;
+
+      if (prop_p == property_p)
+      {
+        JERRY_ASSERT (entry_p->id == ECMA_LCACHE_CREATE_ID (object_cp, property_p->name_cp));
+
+        ecma_lcache_invalidate_entry (entry_p);
+        return;
+      }
     }
     entry_p++;
   }

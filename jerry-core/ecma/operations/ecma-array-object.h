@@ -83,8 +83,7 @@ bool
 ecma_fast_array_set_property (ecma_object_t *object_p, uint32_t index, ecma_value_t value);
 
 void
-ecma_array_object_delete_property (ecma_object_t *object_p, ecma_string_t *property_name_p,
-                                   ecma_property_value_t *prop_value_p);
+ecma_array_object_delete_property (ecma_object_t *object_p, ecma_string_t *prop_name_p, ecma_property_t *prop_p);
 
 uint32_t
 ecma_delete_fast_array_properties (ecma_object_t *object_p, uint32_t new_length);

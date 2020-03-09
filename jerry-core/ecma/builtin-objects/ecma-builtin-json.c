@@ -753,13 +753,10 @@ ecma_builtin_json_parse (ecma_value_t this_arg, /**< 'this' argument */
   {
     ecma_object_t *object_p = ecma_op_create_object_object_noarg ();
 
-    ecma_property_value_t *prop_value_p;
-    prop_value_p = ecma_create_named_data_property (object_p,
-                                                    ecma_get_magic_string (LIT_MAGIC_STRING__EMPTY),
-                                                    ECMA_PROPERTY_CONFIGURABLE_ENUMERABLE_WRITABLE,
-                                                    NULL);
-
-    ecma_named_data_property_assign_value (object_p, prop_value_p, result);
+    ecma_property_t *property_p = ecma_create_named_data_property (object_p,
+                                                                   ecma_get_magic_string (LIT_MAGIC_STRING__EMPTY),
+                                                                   ECMA_PROPERTY_CONFIGURABLE_ENUMERABLE_WRITABLE);
+    ecma_named_data_property_assign_value (object_p, property_p, result);
 
     ecma_free_value (result);
     result = ecma_builtin_json_internalize_property (ecma_get_object_from_value (arg2),

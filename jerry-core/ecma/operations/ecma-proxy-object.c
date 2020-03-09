@@ -173,7 +173,7 @@ ecma_proxy_create_revocable (ecma_value_t target, /**< target argument */
   /* 4. */
   rev_proxy_p->proxy = proxy_value;
 
-  ecma_property_value_t *prop_value_p;
+  ecma_property_t *prop_p;
   ecma_value_t revoker = ecma_make_object_value (func_obj_p);
 
   /* 5. */
@@ -182,18 +182,16 @@ ecma_proxy_create_revocable (ecma_value_t target, /**< target argument */
                                              ECMA_OBJECT_TYPE_GENERAL);
 
   /* 6. */
-  prop_value_p = ecma_create_named_data_property (obj_p,
-                                                  ecma_get_magic_string (LIT_MAGIC_STRING_PROXY),
-                                                  ECMA_PROPERTY_CONFIGURABLE_ENUMERABLE_WRITABLE,
-                                                  NULL);
-  prop_value_p->value = proxy_value;
+  prop_p = ecma_create_named_data_property (obj_p,
+                                            ecma_get_magic_string (LIT_MAGIC_STRING_PROXY),
+                                            ECMA_PROPERTY_CONFIGURABLE_ENUMERABLE_WRITABLE);
+  prop_p->u.value = proxy_value;
 
   /* 7. */
-  prop_value_p = ecma_create_named_data_property (obj_p,
-                                                  ecma_get_magic_string (LIT_MAGIC_STRING_REVOKE),
-                                                  ECMA_PROPERTY_CONFIGURABLE_ENUMERABLE_WRITABLE,
-                                                  NULL);
-  prop_value_p->value = revoker;
+  prop_p = ecma_create_named_data_property (obj_p,
+                                            ecma_get_magic_string (LIT_MAGIC_STRING_REVOKE),
+                                            ECMA_PROPERTY_CONFIGURABLE_ENUMERABLE_WRITABLE);
+  prop_p->u.value = revoker;
 
   ecma_deref_object (proxy_p);
   ecma_deref_object (func_obj_p);

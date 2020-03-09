@@ -103,20 +103,17 @@ ecma_create_iter_result_object (ecma_value_t value, /**< value */
                                                 ECMA_OBJECT_TYPE_GENERAL);
 
   /* 3. */
-  ecma_property_value_t *prop_value_p;
-  prop_value_p = ecma_create_named_data_property (object_p,
-                                                  ecma_get_magic_string (LIT_MAGIC_STRING_VALUE),
-                                                  ECMA_PROPERTY_CONFIGURABLE_ENUMERABLE_WRITABLE,
-                                                  NULL);
+  ecma_property_t *property_p = ecma_create_named_data_property (object_p,
+                                                                 ecma_get_magic_string (LIT_MAGIC_STRING_VALUE),
+                                                                 ECMA_PROPERTY_CONFIGURABLE_ENUMERABLE_WRITABLE);
 
-  prop_value_p->value = ecma_copy_value_if_not_object (value);
+  property_p->u.value = ecma_copy_value_if_not_object (value);
 
   /* 4. */
-  prop_value_p = ecma_create_named_data_property (object_p,
-                                                  ecma_get_magic_string (LIT_MAGIC_STRING_DONE),
-                                                  ECMA_PROPERTY_CONFIGURABLE_ENUMERABLE_WRITABLE,
-                                                  NULL);
-  prop_value_p->value = done;
+  property_p = ecma_create_named_data_property (object_p,
+                                                ecma_get_magic_string (LIT_MAGIC_STRING_DONE),
+                                                ECMA_PROPERTY_CONFIGURABLE_ENUMERABLE_WRITABLE);
+  property_p->u.value = done;
 
   /* 5. */
   return ecma_make_object_value (object_p);

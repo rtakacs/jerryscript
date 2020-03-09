@@ -1521,12 +1521,11 @@ ecma_string_is_length (const ecma_string_t *string_p) /**< property name */
  * @return pointer to the converted ecma string
  */
 static inline ecma_string_t * JERRY_ATTR_ALWAYS_INLINE
-ecma_property_to_string (ecma_property_t property, /**< property name type */
-                         jmem_cpointer_t prop_name_cp) /**< property name compressed pointer */
+ecma_property_to_string (ecma_property_t *property_p) /**< property pointer */
 {
-  uintptr_t property_string = ((uintptr_t) (property)) & (0x3 << ECMA_PROPERTY_NAME_TYPE_SHIFT);
+  uintptr_t property_string = ((uintptr_t) (property_p->type_flags)) & (0x3 << ECMA_PROPERTY_NAME_TYPE_SHIFT);
   property_string = (property_string >> ECMA_STRING_TYPE_CONVERSION_SHIFT) | ECMA_TYPE_DIRECT_STRING;
-  return (ecma_string_t *) (property_string | (((uintptr_t) prop_name_cp) << ECMA_DIRECT_STRING_SHIFT));
+  return (ecma_string_t *) (property_string | (((uintptr_t) property_p->name_cp) << ECMA_DIRECT_STRING_SHIFT));
 } /* ecma_property_to_string */
 
 /**
@@ -1536,11 +1535,11 @@ ecma_property_to_string (ecma_property_t property, /**< property name type */
  */
 inline jmem_cpointer_t JERRY_ATTR_ALWAYS_INLINE
 ecma_string_to_property_name (ecma_string_t *prop_name_p, /**< property name */
-                              ecma_property_t *name_type_p) /**< [out] property name type */
+                              uint8_t *name_type_p) /**< [out] property name type */
 {
   if (ECMA_IS_DIRECT_STRING (prop_name_p))
   {
-    *name_type_p = (ecma_property_t) ECMA_DIRECT_STRING_TYPE_TO_PROP_NAME_TYPE (prop_name_p);
+    *name_type_p = (uint8_t) ECMA_DIRECT_STRING_TYPE_TO_PROP_NAME_TYPE (prop_name_p);
     return (jmem_cpointer_t) ECMA_GET_DIRECT_STRING_VALUE (prop_name_p);
   }
 
@@ -1560,15 +1559,14 @@ ecma_string_to_property_name (ecma_string_t *prop_name_p, /**< property name */
  *         string must be released with ecma_deref_ecma_string
  */
 ecma_string_t *
-ecma_string_from_property_name (ecma_property_t property, /**< property name type */
-                                jmem_cpointer_t prop_name_cp) /**< property name compressed pointer */
+ecma_string_from_property_name (ecma_property_t *property_p) /**< property pointer */
 {
-  if (ECMA_PROPERTY_GET_NAME_TYPE (property) != ECMA_DIRECT_STRING_PTR)
+  if (ECMA_PROPERTY_GET_NAME_TYPE (property_p) != ECMA_DIRECT_STRING_PTR)
   {
-    return ecma_property_to_string (property, prop_name_cp);
+    return ecma_property_to_string (property_p);
   }
 
-  ecma_string_t *prop_name_p = ECMA_GET_NON_NULL_POINTER (ecma_string_t, prop_name_cp);
+  ecma_string_t *prop_name_p = ECMA_GET_NON_NULL_POINTER (ecma_string_t, property_p->name_cp);
   ecma_ref_ecma_string (prop_name_p);
   return prop_name_p;
 } /* ecma_string_from_property_name */
@@ -1579,16 +1577,15 @@ ecma_string_from_property_name (ecma_property_t property, /**< property name typ
  * @return hash code of property name
  */
 inline lit_string_hash_t JERRY_ATTR_ALWAYS_INLINE
-ecma_string_get_property_name_hash (ecma_property_t property, /**< property name type */
-                                    jmem_cpointer_t prop_name_cp) /**< property name compressed pointer */
+ecma_string_get_property_name_hash (ecma_property_t *property_p) /**< property name type */
 {
-  if (ECMA_PROPERTY_GET_NAME_TYPE (property) == ECMA_DIRECT_STRING_PTR)
+  if (ECMA_PROPERTY_GET_NAME_TYPE (property_p) == ECMA_DIRECT_STRING_PTR)
   {
-    ecma_string_t *prop_name_p = ECMA_GET_NON_NULL_POINTER (ecma_string_t, prop_name_cp);
+    ecma_string_t *prop_name_p = ECMA_GET_NON_NULL_POINTER (ecma_string_t, property_p->name_cp);
     return prop_name_p->u.hash;
   }
 
-  return (lit_string_hash_t) prop_name_cp;
+  return (lit_string_hash_t) property_p->name_cp;
 } /* ecma_string_get_property_name_hash */
 
 /**
@@ -1598,18 +1595,17 @@ ecma_string_get_property_name_hash (ecma_property_t property, /**< property name
  *         the array index otherwise
  */
 uint32_t
-ecma_string_get_property_index (ecma_property_t property, /**< property name type */
-                                jmem_cpointer_t prop_name_cp) /**< property name compressed pointer */
+ecma_string_get_property_index (ecma_property_t *property_p) /**< property name type */
 {
-  switch (ECMA_PROPERTY_GET_NAME_TYPE (property))
+  switch (ECMA_PROPERTY_GET_NAME_TYPE (property_p))
   {
     case ECMA_DIRECT_STRING_UINT:
     {
-      return (uint32_t) prop_name_cp;
+      return (uint32_t) property_p->name_cp;
     }
     case ECMA_DIRECT_STRING_PTR:
     {
-      ecma_string_t *prop_name_p = ECMA_GET_NON_NULL_POINTER (ecma_string_t, prop_name_cp);
+      ecma_string_t *prop_name_p = ECMA_GET_NON_NULL_POINTER (ecma_string_t, property_p->name_cp);
       return ecma_string_get_array_index (prop_name_p);
     }
     default:
@@ -1626,13 +1622,12 @@ ecma_string_get_property_index (ecma_property_t property, /**< property name typ
  *         false otherwise
  */
 inline bool JERRY_ATTR_ALWAYS_INLINE
-ecma_string_compare_to_property_name (ecma_property_t property, /**< property name type */
-                                      jmem_cpointer_t prop_name_cp, /**< property name compressed pointer */
+ecma_string_compare_to_property_name (ecma_property_t *property_p, /**< property name type */
                                       const ecma_string_t *string_p) /**< other string */
 {
-  if (ECMA_PROPERTY_GET_NAME_TYPE (property) != ECMA_DIRECT_STRING_PTR)
+  if (ECMA_PROPERTY_GET_NAME_TYPE (property_p) != ECMA_DIRECT_STRING_PTR)
   {
-    return ecma_property_to_string (property, prop_name_cp) == string_p;
+    return ecma_property_to_string (property_p) == string_p;
   }
 
   if (ECMA_IS_DIRECT_STRING (string_p))
@@ -1640,7 +1635,7 @@ ecma_string_compare_to_property_name (ecma_property_t property, /**< property na
     return false;
   }
 
-  ecma_string_t *prop_name_p = ECMA_GET_NON_NULL_POINTER (ecma_string_t, prop_name_cp);
+  ecma_string_t *prop_name_p = ECMA_GET_NON_NULL_POINTER (ecma_string_t, property_p->name_cp);
   return ecma_compare_ecma_non_direct_strings (prop_name_p, string_p);
 } /* ecma_string_compare_to_property_name */
 

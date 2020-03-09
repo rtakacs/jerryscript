@@ -471,25 +471,27 @@ jerry_debugger_send_scope_variables (const uint8_t *recv_buffer_p) /**< pointer 
 
   size_t buffer_pos = 0;
 
-  while (prop_iter_cp != JMEM_CP_NULL)
+  if (prop_iter_cp != JMEM_CP_NULL)
   {
-    ecma_property_header_t *prop_iter_p = ECMA_GET_NON_NULL_POINTER (ecma_property_header_t, prop_iter_cp);
-    JERRY_ASSERT (ECMA_PROPERTY_IS_PROPERTY_PAIR (prop_iter_p));
+    ecma_property_t *property_list_p = ECMA_GET_NON_NULL_POINTER (ecma_property_t, prop_iter_cp);
+    ecma_property_t *property_start_p = ECMA_PROPERTY_LIST_START (property_list_p);
+    ecma_property_index_t property_count = ECMA_PROPERTY_LIST_PROPERTY_COUNT (property_list_p);
 
-    ecma_property_pair_t *prop_pair_p = (ecma_property_pair_t *) prop_iter_p;
-
-    for (int i = 0; i < ECMA_PROPERTY_PAIR_ITEM_COUNT; i++)
+    for (ecma_property_index_t i = 0; i < property_count; i++)
     {
-      if (ECMA_PROPERTY_IS_NAMED_PROPERTY (prop_iter_p->types[i]))
+      ecma_property_t *curr_property_p = property_start_p + i;
+
+      JERRY_ASSERT (ECMA_PROPERTY_IS_PROPERTY (property_start_p));
+
+      if (ECMA_PROPERTY_IS_NAMED_PROPERTY (curr_property_p))
       {
-        if (ECMA_PROPERTY_GET_NAME_TYPE (prop_iter_p->types[i]) == ECMA_DIRECT_STRING_MAGIC
-            && prop_pair_p->names_cp[i] >= LIT_NON_INTERNAL_MAGIC_STRING__COUNT)
+        if (ECMA_PROPERTY_GET_NAME_TYPE (curr_property_p) == ECMA_DIRECT_STRING_MAGIC
+            && curr_property_p->name_cp >= LIT_NON_INTERNAL_MAGIC_STRING__COUNT)
         {
           continue;
         }
 
-        ecma_string_t *prop_name = ecma_string_from_property_name (prop_iter_p->types[i],
-                                                                   prop_pair_p->names_cp[i]);
+        ecma_string_t *prop_name = ecma_string_from_property_name (curr_property_p);
 
         if (!jerry_debugger_copy_variables_to_string_message (JERRY_DEBUGGER_VALUE_NONE,
                                                               prop_name,
@@ -502,11 +504,9 @@ jerry_debugger_send_scope_variables (const uint8_t *recv_buffer_p) /**< pointer 
 
         ecma_deref_ecma_string (prop_name);
 
-        ecma_property_value_t prop_value_p = prop_pair_p->values[i];
+        uint8_t variable_type = jerry_debugger_get_variable_type (curr_property_p->u.value);
 
-        uint8_t variable_type = jerry_debugger_get_variable_type (prop_value_p.value);
-
-        ecma_string_t *str_p = ecma_op_to_string (prop_value_p.value);
+        ecma_string_t *str_p = ecma_op_to_string (curr_property_p->u.value);
         JERRY_ASSERT (str_p != NULL);
 
         if (!jerry_debugger_copy_variables_to_string_message (variable_type,
@@ -521,8 +521,6 @@ jerry_debugger_send_scope_variables (const uint8_t *recv_buffer_p) /**< pointer 
         ecma_deref_ecma_string (str_p);
       }
     }
-
-    prop_iter_cp = prop_iter_p->next_property_cp;
   }
 
   message_string_p->type = JERRY_DEBUGGER_SCOPE_VARIABLES_END;
@@ -1483,21 +1481,19 @@ jerry_debugger_exception_object_to_string (ecma_value_t exception_obj_value) /**
                                          ecma_get_magic_string (LIT_MAGIC_STRING_MESSAGE));
 
   if (property_p == NULL
-      || ECMA_PROPERTY_GET_TYPE (*property_p) != ECMA_PROPERTY_TYPE_NAMEDDATA)
+      || ECMA_PROPERTY_GET_TYPE (property_p) != ECMA_PROPERTY_TYPE_NAMEDDATA)
   {
     return ecma_stringbuilder_finalize (&builder);
   }
 
-  ecma_property_value_t *prop_value_p = ECMA_PROPERTY_VALUE_PTR (property_p);
-
-  if (!ecma_is_value_string (prop_value_p->value))
+  if (!ecma_is_value_string (property_p->u.value))
   {
     return ecma_stringbuilder_finalize (&builder);
   }
 
   ecma_stringbuilder_append_byte (&builder, LIT_CHAR_COLON);
   ecma_stringbuilder_append_byte (&builder, LIT_CHAR_SP);
-  ecma_stringbuilder_append (&builder, ecma_get_string_from_value (prop_value_p->value));
+  ecma_stringbuilder_append (&builder, ecma_get_string_from_value (property_p->u.value));
 
   return ecma_stringbuilder_finalize (&builder);
 } /* jerry_debugger_exception_object_to_string */

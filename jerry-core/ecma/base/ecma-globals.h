@@ -310,18 +310,6 @@ typedef struct ecma_native_pointer_t
 } ecma_native_pointer_t;
 
 /**
- * Property list:
- *   The property list of an object is a chain list of various items.
- *   The type of each item is stored in the first byte of the item.
- *
- *   The most common item is the property pair, which contains two
- *   ecmascript properties. It is also important, that after the
- *   first property pair, only property pair items are allowed.
- *
- *   Example for other items is property name hash map, or array of items.
- */
-
-/**
  * Property type list.
  */
 typedef enum
@@ -427,23 +415,24 @@ typedef enum
  * Convert data property to internal property.
  */
 #define ECMA_CONVERT_DATA_PROPERTY_TO_INTERNAL_PROPERTY(property_p) \
-   *(property_p) = (uint8_t) (*(property_p) + (ECMA_PROPERTY_TYPE_INTERNAL - ECMA_PROPERTY_TYPE_NAMEDDATA))
+   (property_p)->type_flags = \
+     (uint8_t) ((property_p)->type_flags + (ECMA_PROPERTY_TYPE_INTERNAL - ECMA_PROPERTY_TYPE_NAMEDDATA))
 
 /**
  * Convert internal property to data property.
  */
 #define ECMA_CONVERT_INTERNAL_PROPERTY_TO_DATA_PROPERTY(property_p) \
-   *(property_p) = (uint8_t) (*(property_p) - (ECMA_PROPERTY_TYPE_INTERNAL - ECMA_PROPERTY_TYPE_NAMEDDATA))
+   (property_p)->type_flags = \
+     (uint8_t) ((property_p)->type_flags - (ECMA_PROPERTY_TYPE_INTERNAL - ECMA_PROPERTY_TYPE_NAMEDDATA))
 
 /**
  * Special property identifiers.
  */
 typedef enum
 {
-  /* Note: when new special types are added
-   * ECMA_PROPERTY_IS_PROPERTY_PAIR must be updated as well. */
   ECMA_SPECIAL_PROPERTY_HASHMAP, /**< hashmap property */
   ECMA_SPECIAL_PROPERTY_DELETED, /**< deleted property */
+  ECMA_SPECIAL_PROPERTY_COUNTER, /**< counter property */
 
   ECMA_SPECIAL_PROPERTY__COUNT /**< Number of special property types */
 } ecma_special_property_id_t;
@@ -465,6 +454,11 @@ typedef enum
 #define ECMA_PROPERTY_TYPE_HASHMAP ECMA_SPECIAL_PROPERTY_VALUE (ECMA_SPECIAL_PROPERTY_HASHMAP)
 
 /**
+ * Type of hash-map property.
+ */
+#define ECMA_PROPERTY_TYPE_COUNTER ECMA_SPECIAL_PROPERTY_VALUE (ECMA_SPECIAL_PROPERTY_COUNTER)
+
+/**
  * Type of property not found.
  */
 #define ECMA_PROPERTY_TYPE_NOT_FOUND ECMA_PROPERTY_TYPE_HASHMAP
@@ -473,50 +467,6 @@ typedef enum
  * Type of property not found and no more searching in the proto chain.
  */
 #define ECMA_PROPERTY_TYPE_NOT_FOUND_AND_STOP ECMA_PROPERTY_TYPE_DELETED
-
-/**
- * Abstract property representation.
- *
- * A property is a type_and_flags byte and an ecma_value_t value pair.
- * This pair is represented by a single pointer in JerryScript. Although
- * a packed struct would only consume sizeof(ecma_value_t)+1 memory
- * bytes, accessing such structure is inefficient from the CPU viewpoint
- * because the value is not naturally aligned. To improve performance,
- * two type bytes and values are packed together. The memory layout is
- * the following:
- *
- *  [type 1, type 2, unused byte 1, unused byte 2][value 1][value 2]
- *
- * The unused two bytes are used to store a compressed pointer for the
- * next property pair.
- *
- * The advantage of this layout is that the value reference can be computed
- * from the property address. However, property pointers cannot be compressed
- * anymore.
- */
-typedef uint8_t ecma_property_t; /**< ecma_property_types_t (3 bit) and ecma_property_flags_t */
-
-/**
- * Number of items in a property pair.
- */
-#define ECMA_PROPERTY_PAIR_ITEM_COUNT 2
-
-/**
- * Property header for all items in a property list.
- */
-typedef struct
-{
-#if ENABLED (JERRY_CPOINTER_32_BIT)
-  jmem_cpointer_t next_property_cp; /**< next cpointer */
-#endif /* ENABLED (JERRY_CPOINTER_32_BIT) */
-  ecma_property_t types[ECMA_PROPERTY_PAIR_ITEM_COUNT]; /**< two property type slot. The first represent
-                                                         *   the type of this property (e.g. property pair) */
-#if ENABLED (JERRY_CPOINTER_32_BIT)
-  uint16_t padding; /**< an unused value */
-#else /* !ENABLED (JERRY_CPOINTER_32_BIT) */
-  jmem_cpointer_t next_property_cp; /**< next cpointer */
-#endif /* ENABLED (JERRY_CPOINTER_32_BIT) */
-} ecma_property_header_t;
 
 /**
  * Pair of pointers - to property's getter and setter
@@ -541,57 +491,84 @@ typedef union
 } ecma_property_value_t;
 
 /**
- * Property pair.
+ * Property descriptor.
+ *
+ * Note:
+ *  The memory layout of a property list is a linear sequence of properties.
+ *  It starts with a special counter property that tracks the number of the
+ *  allocated properties. After that, the concrete properties follow.
+ *
+ *  +------------------+------------+-----------+-----+------------+
+ *  | Counter property | property 1 | property 2| ... | property N |
+ *  +------------------+------------+-----------+-----+------------+
  */
 typedef struct
 {
-  ecma_property_header_t header; /**< header of the property */
-  ecma_property_value_t values[ECMA_PROPERTY_PAIR_ITEM_COUNT]; /**< property value slots */
-  jmem_cpointer_t names_cp[ECMA_PROPERTY_PAIR_ITEM_COUNT]; /**< property name slots */
-} ecma_property_pair_t;
+  uint8_t type_flags; /**< ecma_property_types_t (3 bit) and ecma_property_flags_t */
+  uint8_t prop_count; /**< unused */
+  jmem_cpointer_t name_cp; /**< name of the property */
+  ecma_property_value_t u; /**< value of the property */
+} ecma_property_t;
+
+/**
+ * Property index identifier.
+ */
+#if ENABLED (JERRY_CPOINTER_32_BIT)
+typedef uint32_t ecma_property_index_t;
+#else /* !ENABLED (JERRY_CPOINTER_32_BIT) */
+typedef uint16_t ecma_property_index_t;
+#endif /* ENABLED (JERRY_CPOINTER_32_BIT) */
+
+/**
+ * Invalid property index.
+ */
+#if ENABLED (JERRY_CPOINTER_32_BIT)
+#define ECMA_PROPERTY_INDEX_INVALID UINT32_MAX
+#else /* !ENABLED (JERRY_CPOINTER_32_BIT) */
+#define ECMA_PROPERTY_INDEX_INVALID UINT16_MAX
+#endif /* ENABLED (JERRY_CPOINTER_32_BIT) */
+
+/**
+ * First property value of the property list.
+ */
+#define ECMA_PROPERTY_LIST_START(property_list_p) \
+  ((ecma_property_t *)(property_list_p + 1u))
+
+/**
+ * Number of property entries in the property list.
+ */
+#define ECMA_PROPERTY_LIST_PROPERTY_COUNT(property_list_p) \
+  ((ecma_property_index_t) property_list_p[0].u.value)
 
 /**
  * Get property type.
  */
-#define ECMA_PROPERTY_GET_TYPE(property) \
-  ((ecma_property_types_t) ((property) & ECMA_PROPERTY_TYPE_MASK))
+#define ECMA_PROPERTY_GET_TYPE(property_p) \
+  ((ecma_property_types_t) ((property_p)->type_flags & ECMA_PROPERTY_TYPE_MASK))
+
+/**
+ * Get type from raw value.
+ */
+#define ECMA_PROPERTY_TYPE(flags) \
+  ((ecma_property_types_t) (flags & ECMA_PROPERTY_TYPE_MASK))
 
 /**
  * Get property name type.
  */
-#define ECMA_PROPERTY_GET_NAME_TYPE(property) \
-  ((property) >> ECMA_PROPERTY_NAME_TYPE_SHIFT)
+#define ECMA_PROPERTY_GET_NAME_TYPE(property_p) \
+  ((property_p)->type_flags >> ECMA_PROPERTY_NAME_TYPE_SHIFT)
 
 /**
  * Returns true if the property pointer is a property pair.
  */
-#define ECMA_PROPERTY_IS_PROPERTY_PAIR(property_header_p) \
-  ((property_header_p)->types[0] != ECMA_PROPERTY_TYPE_HASHMAP)
+#define ECMA_PROPERTY_IS_PROPERTY(property_p) \
+  ((property_p)->type_flags != ECMA_PROPERTY_TYPE_HASHMAP)
 
 /**
  * Returns true if the property is named property.
  */
-#define ECMA_PROPERTY_IS_NAMED_PROPERTY(property) \
-  (ECMA_PROPERTY_GET_TYPE (property) != ECMA_PROPERTY_TYPE_SPECIAL)
-
-/**
- * Add the offset part to a property for computing its property data pointer.
- */
-#define ECMA_PROPERTY_VALUE_ADD_OFFSET(property_p) \
-  ((uintptr_t) ((((uint8_t *) (property_p)) + (sizeof (ecma_property_value_t) * 2 - 1))))
-
-/**
- * Align the property for computing its property data pointer.
- */
-#define ECMA_PROPERTY_VALUE_DATA_PTR(property_p) \
-  (ECMA_PROPERTY_VALUE_ADD_OFFSET (property_p) & ~(sizeof (ecma_property_value_t) - 1))
-
-/**
- * Compute the property data pointer of a property.
- * The property must be part of a property pair.
- */
-#define ECMA_PROPERTY_VALUE_PTR(property_p) \
-  ((ecma_property_value_t *) ECMA_PROPERTY_VALUE_DATA_PTR (property_p))
+#define ECMA_PROPERTY_IS_NAMED_PROPERTY(property_p) \
+  (ECMA_PROPERTY_GET_TYPE (property_p) != ECMA_PROPERTY_TYPE_SPECIAL)
 
 /**
  * Property reference. It contains the value pointer
@@ -599,19 +576,9 @@ typedef struct
  */
 typedef union
 {
-  ecma_property_value_t *value_p; /**< property value pointer for real properties */
+  ecma_property_t *property_p; /**< property pointer for real properties */
   ecma_value_t virtual_value; /**< property value for virtual properties */
 } ecma_property_ref_t;
-
-/**
- * Extended property reference, which also contains the
- * property descriptor pointer for real properties.
- */
-typedef struct
-{
-  ecma_property_ref_t property_ref; /**< property reference */
-  ecma_property_t *property_p; /**< property descriptor pointer for real properties */
-} ecma_extended_property_ref_t;
 
 /**
  * Option flags for ecma_op_object_get_property.
@@ -620,8 +587,7 @@ typedef enum
 {
   ECMA_PROPERTY_GET_NO_OPTIONS = 0, /**< no option flags for ecma_op_object_get_property */
   ECMA_PROPERTY_GET_VALUE = 1u << 0, /**< fill virtual_value field for virtual properties */
-  ECMA_PROPERTY_GET_EXT_REFERENCE = 1u << 1, /**< get extended reference to the property */
-  ECMA_PROPERTY_GET_HAS_OWN_PROP = 1u << 2, /**< internal [[HasOwnProperty]] method */
+  ECMA_PROPERTY_GET_HAS_OWN_PROP = 1u << 1, /**< internal [[HasOwnProperty]] method */
 } ecma_property_get_option_bits_t;
 
 /**
@@ -868,7 +834,7 @@ typedef struct
       uint32_t length; /**< length property value */
       union
       {
-        ecma_property_t length_prop; /**< length property */
+        uint8_t length_prop; /**< length property */
         uint32_t hole_count; /**< number of array holes in a fast access mode array
                               *   multiplied ECMA_FAST_ACCESS_HOLE_ONE */
       } u;
@@ -1724,11 +1690,10 @@ typedef uint32_t ecma_lcache_hash_entry_id_t;
  */
 typedef struct
 {
-  /** Pointer to a property of the object */
-  ecma_property_t *prop_p;
+  jmem_cpointer_t object_cp; /**< Object compressed pointer */
+  ecma_property_index_t index; /**< Identifier on the property list */
 
-  /** Entry identifier in LCache */
-  ecma_lcache_hash_entry_id_t id;
+  ecma_lcache_hash_entry_id_t id; /**< Entry identifier in LCache */
 } ecma_lcache_hash_entry_t;
 
 /**

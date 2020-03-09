@@ -134,36 +134,32 @@ ecma_regexp_create_props (ecma_object_t *re_object_p, /**< RegExp object */
                           ecma_string_t *source_p, /**< source string */
                           uint16_t flags) /**< flags */
 {
-  ecma_property_value_t *prop_value_p;
+  ecma_property_t *property_p;
 
-  prop_value_p = ecma_create_named_data_property (re_object_p,
-                                                  ecma_get_magic_string (LIT_MAGIC_STRING_SOURCE),
-                                                  ECMA_PROPERTY_FIXED,
-                                                  NULL);
+  property_p = ecma_create_named_data_property (re_object_p,
+                                                ecma_get_magic_string (LIT_MAGIC_STRING_SOURCE),
+                                                ECMA_PROPERTY_FIXED);
 
   ecma_ref_ecma_string (source_p);
-  prop_value_p->value = ecma_make_string_value (source_p);
+  property_p->u.value = ecma_make_string_value (source_p);
 
-  prop_value_p = ecma_create_named_data_property (re_object_p,
-                                                  ecma_get_magic_string (LIT_MAGIC_STRING_GLOBAL),
-                                                  ECMA_PROPERTY_FIXED,
-                                                  NULL);
+  property_p = ecma_create_named_data_property (re_object_p,
+                                                ecma_get_magic_string (LIT_MAGIC_STRING_GLOBAL),
+                                                ECMA_PROPERTY_FIXED);
 
-  prop_value_p->value = ecma_make_boolean_value (flags & RE_FLAG_GLOBAL);
+  property_p->u.value = ecma_make_boolean_value (flags & RE_FLAG_GLOBAL);
 
-  prop_value_p = ecma_create_named_data_property (re_object_p,
-                                                  ecma_get_magic_string (LIT_MAGIC_STRING_IGNORECASE_UL),
-                                                  ECMA_PROPERTY_FIXED,
-                                                  NULL);
+  property_p = ecma_create_named_data_property (re_object_p,
+                                                ecma_get_magic_string (LIT_MAGIC_STRING_IGNORECASE_UL),
+                                                ECMA_PROPERTY_FIXED);
 
-  prop_value_p->value = ecma_make_boolean_value (flags & RE_FLAG_IGNORE_CASE);
+  property_p->u.value = ecma_make_boolean_value (flags & RE_FLAG_IGNORE_CASE);
 
-  prop_value_p = ecma_create_named_data_property (re_object_p,
-                                                  ecma_get_magic_string (LIT_MAGIC_STRING_MULTILINE),
-                                                  ECMA_PROPERTY_FIXED,
-                                                  NULL);
+  property_p = ecma_create_named_data_property (re_object_p,
+                                                ecma_get_magic_string (LIT_MAGIC_STRING_MULTILINE),
+                                                ECMA_PROPERTY_FIXED);
 
-  prop_value_p->value = ecma_make_boolean_value (flags & RE_FLAG_MULTILINE);
+  property_p->u.value = ecma_make_boolean_value (flags & RE_FLAG_MULTILINE);
 } /* ecma_regexp_create_props */
 
 /*
@@ -178,25 +174,21 @@ ecma_regexp_update_props (ecma_object_t *re_object_p, /**< RegExp object */
 
   prop_p = ecma_find_named_property (re_object_p, ecma_get_magic_string (LIT_MAGIC_STRING_SOURCE));
   JERRY_ASSERT (prop_p != NULL);
-  ecma_property_value_t *prop_value_p = ECMA_PROPERTY_VALUE_PTR (prop_p);
-  ecma_free_value (prop_value_p->value);
+  ecma_free_value (prop_p->u.value);
   ecma_ref_ecma_string (source_p);
-  prop_value_p->value = ecma_make_string_value (source_p);
+  prop_p->u.value = ecma_make_string_value (source_p);
 
   prop_p = ecma_find_named_property (re_object_p, ecma_get_magic_string (LIT_MAGIC_STRING_GLOBAL));
   JERRY_ASSERT (prop_p != NULL);
-  prop_value_p = ECMA_PROPERTY_VALUE_PTR (prop_p);
-  prop_value_p->value = ecma_make_boolean_value (flags & RE_FLAG_GLOBAL);
+  prop_p->u.value = ecma_make_boolean_value (flags & RE_FLAG_GLOBAL);
 
   prop_p = ecma_find_named_property (re_object_p, ecma_get_magic_string (LIT_MAGIC_STRING_IGNORECASE_UL));
   JERRY_ASSERT (prop_p != NULL);
-  prop_value_p = ECMA_PROPERTY_VALUE_PTR (prop_p);
-  prop_value_p->value = ecma_make_boolean_value (flags & RE_FLAG_IGNORE_CASE);
+  prop_p->u.value = ecma_make_boolean_value (flags & RE_FLAG_IGNORE_CASE);
 
   prop_p = ecma_find_named_property (re_object_p, ecma_get_magic_string (LIT_MAGIC_STRING_MULTILINE));
   JERRY_ASSERT (prop_p != NULL);
-  prop_value_p = ECMA_PROPERTY_VALUE_PTR (prop_p);
-  prop_value_p->value = ecma_make_boolean_value (flags & RE_FLAG_MULTILINE);
+  prop_p->u.value = ecma_make_boolean_value (flags & RE_FLAG_MULTILINE);
 } /* ecma_regexp_update_props */
 #endif /* !ENABLED (JERRY_ES2015) */
 

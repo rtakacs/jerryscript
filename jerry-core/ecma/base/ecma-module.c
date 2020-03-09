@@ -507,14 +507,13 @@ ecma_module_namespace_object_add_export_if_needed (ecma_module_t *module_p, /**<
   ecma_value_t prop_value = ecma_op_get_value_lex_env_base (record.module_p->scope_p,
                                                             &ref_base_lex_env_p,
                                                             record.name_p);
-  ecma_property_t *new_property_p;
-  ecma_create_named_data_property (module_p->namespace_object_p,
-                                   export_name_p,
-                                   ECMA_PROPERTY_FIXED,
-                                   &new_property_p);
+
+  ecma_property_t *new_property_p = ecma_create_named_data_property (module_p->namespace_object_p,
+                                                                     export_name_p,
+                                                                     ECMA_PROPERTY_FIXED);
 
   ecma_named_data_property_assign_value (module_p->namespace_object_p,
-                                         ECMA_PROPERTY_VALUE_PTR (new_property_p),
+                                         new_property_p,
                                          prop_value);
 
   ecma_free_value (prop_value);

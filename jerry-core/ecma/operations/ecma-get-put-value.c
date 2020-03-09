@@ -62,17 +62,16 @@ ecma_op_get_value_lex_env_base (ecma_object_t *lex_env_p, /**< lexical environme
         if (property_p != NULL)
         {
           *ref_base_lex_env_p = lex_env_p;
-          ecma_property_value_t *property_value_p = ECMA_PROPERTY_VALUE_PTR (property_p);
 
 #if ENABLED (JERRY_ES2015)
-          if (JERRY_UNLIKELY (property_value_p->value == ECMA_VALUE_UNINITIALIZED))
+          if (JERRY_UNLIKELY (property_p->u.value == ECMA_VALUE_UNINITIALIZED))
           {
             return ecma_raise_reference_error (ECMA_ERR_MSG ("Variables declared by let/const must be"
                                                              " initialized before reading their value."));
           }
 #endif /* ENABLED (JERRY_ES2015) */
 
-          return ecma_fast_copy_value (property_value_p->value);
+          return ecma_fast_copy_value (property_p->u.value);
         }
         break;
       }
@@ -243,19 +242,17 @@ ecma_op_put_value_lex_env_base (ecma_object_t *lex_env_p, /**< lexical environme
 
         if (property_p != NULL)
         {
-          if (ecma_is_property_writable (*property_p))
+          if (ecma_is_property_writable (property_p))
           {
-            ecma_property_value_t *property_value_p = ECMA_PROPERTY_VALUE_PTR (property_p);
-
 #if ENABLED (JERRY_ES2015)
-            if (JERRY_UNLIKELY (property_value_p->value == ECMA_VALUE_UNINITIALIZED))
+            if (JERRY_UNLIKELY (property_p->u.value == ECMA_VALUE_UNINITIALIZED))
             {
               return ecma_raise_reference_error (ECMA_ERR_MSG ("Variables declared by let/const must be"
                                                                " initialized before writing their value."));
             }
 #endif /* ENABLED (JERRY_ES2015) */
 
-            ecma_named_data_property_assign_value (lex_env_p, property_value_p, value);
+            ecma_named_data_property_assign_value (lex_env_p, property_p, value);
           }
 #if ENABLED (JERRY_ES2015)
           else if (ecma_is_property_enumerable (*property_p))

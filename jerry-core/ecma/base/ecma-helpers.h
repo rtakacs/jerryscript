@@ -345,12 +345,11 @@ bool ecma_compare_ecma_string_to_magic_id (const ecma_string_t *string_p, lit_ma
 bool ecma_string_is_empty (const ecma_string_t *string_p);
 bool ecma_string_is_length (const ecma_string_t *string_p);
 
-jmem_cpointer_t ecma_string_to_property_name (ecma_string_t *prop_name_p, ecma_property_t *name_type_p);
-ecma_string_t *ecma_string_from_property_name (ecma_property_t property, jmem_cpointer_t prop_name_cp);
-lit_string_hash_t ecma_string_get_property_name_hash (ecma_property_t property, jmem_cpointer_t prop_name_cp);
-uint32_t ecma_string_get_property_index (ecma_property_t property, jmem_cpointer_t prop_name_cp);
-bool ecma_string_compare_to_property_name (ecma_property_t property, jmem_cpointer_t prop_name_cp,
-                                           const ecma_string_t *string_p);
+jmem_cpointer_t ecma_string_to_property_name (ecma_string_t *prop_name_p, uint8_t *name_type_p);
+ecma_string_t *ecma_string_from_property_name (ecma_property_t *property);
+lit_string_hash_t ecma_string_get_property_name_hash (ecma_property_t *property);
+uint32_t ecma_string_get_property_index (ecma_property_t *property);
+bool ecma_string_compare_to_property_name (ecma_property_t *property, const ecma_string_t *string_p);
 
 bool ecma_compare_ecma_strings (const ecma_string_t *string1_p, const ecma_string_t *string2_p);
 bool ecma_compare_ecma_non_direct_strings (const ecma_string_t *string1_p, const ecma_string_t *string2_p);
@@ -437,35 +436,34 @@ ecma_object_t JERRY_ATTR_PURE *ecma_get_lex_env_binding_object (const ecma_objec
 ecma_object_t *ecma_clone_decl_lexical_environment (ecma_object_t *lex_env_p, bool copy_values);
 ecma_extended_object_t *ecma_op_check_object_type_is_class (ecma_value_t this);
 
-ecma_property_value_t *
-ecma_create_named_data_property (ecma_object_t *object_p, ecma_string_t *name_p, uint8_t prop_attributes,
-                                 ecma_property_t **out_prop_p);
-ecma_property_value_t *
+ecma_property_t *
+ecma_create_named_data_property (ecma_object_t *object_p, ecma_string_t *name_p, uint8_t prop_attributes);
+ecma_property_t *
 ecma_create_named_accessor_property (ecma_object_t *object_p, ecma_string_t *name_p, ecma_object_t *get_p,
-                                     ecma_object_t *set_p, uint8_t prop_attributes, ecma_property_t **out_prop_p);
+                                     ecma_object_t *set_p, uint8_t prop_attributes);
 ecma_property_t *
 ecma_find_named_property (ecma_object_t *obj_p, ecma_string_t *name_p);
-ecma_property_value_t *
+ecma_property_t *
 ecma_get_named_data_property (ecma_object_t *obj_p, ecma_string_t *name_p);
 
-void ecma_free_property (ecma_object_t *object_p, jmem_cpointer_t name_cp, ecma_property_t *property_p);
+void ecma_free_property (ecma_object_t *object_p, ecma_property_t *property_p);
 
-void ecma_delete_property (ecma_object_t *object_p, ecma_property_value_t *prop_value_p);
+void ecma_delete_property (ecma_object_t *object_p, ecma_property_t *prop_p);
 
-void ecma_named_data_property_assign_value (ecma_object_t *obj_p, ecma_property_value_t *prop_value_p,
+void ecma_named_data_property_assign_value (ecma_object_t *obj_p, ecma_property_t *prop_value_p,
                                             ecma_value_t value);
 
 ecma_getter_setter_pointers_t *
-ecma_get_named_accessor_property (const ecma_property_value_t *prop_value_p);
-void ecma_set_named_accessor_property_getter (ecma_object_t *object_p, ecma_property_value_t *prop_value_p,
+ecma_get_named_accessor_property (const ecma_property_t *prop_p);
+void ecma_set_named_accessor_property_getter (ecma_object_t *object_p, ecma_property_t *prop_p,
                                               ecma_object_t *getter_p);
-void ecma_set_named_accessor_property_setter (ecma_object_t *object_p, ecma_property_value_t *prop_value_p,
+void ecma_set_named_accessor_property_setter (ecma_object_t *object_p, ecma_property_t *prop_p,
                                               ecma_object_t *setter_p);
-bool ecma_is_property_writable (ecma_property_t property);
+bool ecma_is_property_writable (ecma_property_t *property);
 void ecma_set_property_writable_attr (ecma_property_t *property_p, bool is_writable);
-bool ecma_is_property_enumerable (ecma_property_t property);
+bool ecma_is_property_enumerable (ecma_property_t *property);
 void ecma_set_property_enumerable_attr (ecma_property_t *property_p, bool is_enumerable);
-bool ecma_is_property_configurable (ecma_property_t property);
+bool ecma_is_property_configurable (ecma_property_t *property);
 void ecma_set_property_configurable_attr (ecma_property_t *property_p, bool is_configurable);
 
 #if ENABLED (JERRY_LCACHE)

@@ -1215,7 +1215,7 @@ scanner_scope_find_let_declaration (parser_context_t *context_p, /**< context */
     {
       ecma_property_t *property_p = ecma_find_named_property (lex_env_p, name_p);
 
-      if (property_p != NULL && ecma_is_property_enumerable (*property_p))
+      if (property_p != NULL && ecma_is_property_enumerable (property_p))
       {
         ecma_deref_ecma_string (name_p);
         return true;
@@ -1230,7 +1230,7 @@ scanner_scope_find_let_declaration (parser_context_t *context_p, /**< context */
   {
     ecma_property_t *property_p = ecma_find_named_property (lex_env_p, name_p);
 
-    if (property_p != NULL && ecma_is_property_enumerable (*property_p))
+    if (property_p != NULL && ecma_is_property_enumerable (property_p))
     {
       ecma_deref_ecma_string (name_p);
       return true;

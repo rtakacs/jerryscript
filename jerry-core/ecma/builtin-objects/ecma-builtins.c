@@ -651,8 +651,6 @@ ecma_builtin_try_to_instantiate_property (ecma_object_t *object_p, /**< object *
       /*
        * Lazy instantiation of 'length' property
        */
-
-      ecma_property_t *len_prop_p;
 #if ENABLED (JERRY_ES2015)
       ecma_extended_object_t *ext_func_p = (ecma_extended_object_t *) object_p;
       uint32_t *bitset_p = ext_func_p->u.built_in.instantiated_bitset;
@@ -664,24 +662,22 @@ ecma_builtin_try_to_instantiate_property (ecma_object_t *object_p, /**< object *
       /* We mark that the property was lazily instantiated,
        * as it is configurable and so can be deleted (ECMA-262 v6, 19.2.4.1) */
       *bitset_p |= (1u << 0);
-      ecma_property_value_t *len_prop_value_p = ecma_create_named_data_property (object_p,
-                                                                                 string_p,
-                                                                                 ECMA_PROPERTY_FLAG_CONFIGURABLE,
-                                                                                 &len_prop_p);
+      ecma_property_t *len_prop_p = ecma_create_named_data_property (object_p,
+                                                                     string_p,
+                                                                     ECMA_PROPERTY_FLAG_CONFIGURABLE);
 #else /* !ENABLED (JERRY_ES2015) */
       /* We don't need to mark that the property was already lazy instantiated,
        * as it is non-configurable and so can't be deleted (ECMA-262 v5, 13.2.5) */
-      ecma_property_value_t *len_prop_value_p = ecma_create_named_data_property (object_p,
-                                                                                 string_p,
-                                                                                 ECMA_PROPERTY_FIXED,
-                                                                                 &len_prop_p);
+      ecma_property_t *len_prop_p = ecma_create_named_data_property (object_p,
+                                                                     string_p,
+                                                                     ECMA_PROPERTY_FIXED);
 #endif /* ENABLED (JERRY_ES2015) */
 
       ecma_extended_object_t *ext_obj_p = (ecma_extended_object_t *) object_p;
 
       uint8_t length = ext_obj_p->u.built_in.length_and_bitset_size & ((1 << ECMA_BUILT_IN_BITSET_SHIFT) - 1);
 
-      len_prop_value_p->value = ecma_make_integer_value (length);
+      len_prop_p->u.value = ecma_make_integer_value (length);
 
       return len_prop_p;
     }
@@ -901,12 +897,11 @@ ecma_builtin_try_to_instantiate_property (ecma_object_t *object_p, /**< object *
 
   if (is_accessor)
   {
-    ecma_create_named_accessor_property (object_p,
-                                         string_p,
-                                         getter_p,
-                                         setter_p,
-                                         curr_property_p->attributes,
-                                         &prop_p);
+    prop_p = ecma_create_named_accessor_property (object_p,
+                                                  string_p,
+                                                  getter_p,
+                                                  setter_p,
+                                                  curr_property_p->attributes);
 
     if (setter_p)
     {
@@ -919,11 +914,10 @@ ecma_builtin_try_to_instantiate_property (ecma_object_t *object_p, /**< object *
   }
   else
   {
-    ecma_property_value_t *prop_value_p = ecma_create_named_data_property (object_p,
-                                                                           string_p,
-                                                                           curr_property_p->attributes,
-                                                                           &prop_p);
-    prop_value_p->value = value;
+    prop_p = ecma_create_named_data_property (object_p,
+                                              string_p,
+                                              curr_property_p->attributes);
+    prop_p->u.value = value;
 
     /* Reference count of objects must be decreased. */
     if (ecma_is_value_object (value))

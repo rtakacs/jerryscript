@@ -53,20 +53,17 @@ ecma_create_native_pointer_property (ecma_object_t *obj_p, /**< object to create
 
   if (property_p == NULL)
   {
-    ecma_property_value_t *value_p;
-    value_p = ecma_create_named_data_property (obj_p, name_p, ECMA_PROPERTY_CONFIGURABLE_WRITABLE, &property_p);
+    property_p = ecma_create_named_data_property (obj_p, name_p, ECMA_PROPERTY_CONFIGURABLE_WRITABLE);
 
     ECMA_CONVERT_DATA_PROPERTY_TO_INTERNAL_PROPERTY (property_p);
 
     native_pointer_p = jmem_heap_alloc_block (sizeof (ecma_native_pointer_t));
 
-    ECMA_SET_INTERNAL_VALUE_POINTER (value_p->value, native_pointer_p);
+    ECMA_SET_INTERNAL_VALUE_POINTER (property_p->u.value, native_pointer_p);
   }
   else
   {
-    ecma_property_value_t *value_p = ECMA_PROPERTY_VALUE_PTR (property_p);
-
-    ecma_native_pointer_t *iter_p = ECMA_GET_INTERNAL_VALUE_POINTER (ecma_native_pointer_t, value_p->value);
+    ecma_native_pointer_t *iter_p = ECMA_GET_INTERNAL_VALUE_POINTER (ecma_native_pointer_t, property_p->u.value);
 
     /* There should be at least 1 native pointer in the chain */
     JERRY_ASSERT (iter_p != NULL);
@@ -129,10 +126,8 @@ ecma_get_native_pointer_value (ecma_object_t *obj_p, /**< object to get property
     return NULL;
   }
 
-  ecma_property_value_t *value_p = ECMA_PROPERTY_VALUE_PTR (property_p);
-
   ecma_native_pointer_t *native_pointer_p = ECMA_GET_INTERNAL_VALUE_POINTER (ecma_native_pointer_t,
-                                                                             value_p->value);
+                                                                             property_p->u.value);
 
   JERRY_ASSERT (native_pointer_p != NULL);
 
@@ -177,10 +172,8 @@ ecma_delete_native_pointer_property (ecma_object_t *obj_p, /**< object to delete
     return false;
   }
 
-  ecma_property_value_t *value_p = ECMA_PROPERTY_VALUE_PTR (property_p);
-
   ecma_native_pointer_t *native_pointer_p = ECMA_GET_INTERNAL_VALUE_POINTER (ecma_native_pointer_t,
-                                                                             value_p->value);
+                                                                             property_p->u.value);
   ecma_native_pointer_t *prev_p = NULL;
 
   JERRY_ASSERT (native_pointer_p != NULL);

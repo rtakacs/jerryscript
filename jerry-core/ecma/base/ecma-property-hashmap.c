@@ -29,10 +29,34 @@
 #if ENABLED (JERRY_PROPRETY_HASHMAP)
 
 /**
+ * Clean enrty marker.
+ */
+#define ECMA_PROPERTY_HASHMAP_CLEAN_ENTRY ECMA_PROPERTY_INDEX_INVALID
+
+/**
+ * Deleted entry marker.
+ */
+#define ECMA_PROPERTY_HASHMAP_DIRTY_ENTRY (ECMA_PROPERTY_INDEX_INVALID - 1u)
+
+/**
+ * Hashmap memory fill pattern.
+ *
+ * Note:
+ *   This pattern is used in case of memset to initialize the entries as clean.
+ */
+#define ECMA_PROPERTY_HASHMAP_FILL_PATTERN 0xff
+
+/**
+ * Compute the total size of the property hashmap.
+ */
+#define ECMA_PROPERTY_HASHMAP_GET_ENTRY_SIZE(max_property_count) \
+  (max_property_count * sizeof (ecma_property_index_t))
+
+/**
  * Compute the total size of the property hashmap.
  */
 #define ECMA_PROPERTY_HASHMAP_GET_TOTAL_SIZE(max_property_count) \
-  (sizeof (ecma_property_hashmap_t) + (max_property_count * sizeof (jmem_cpointer_t)) + (max_property_count >> 3))
+  (sizeof (ecma_property_hashmap_t) + ECMA_PROPERTY_HASHMAP_GET_ENTRY_SIZE (max_property_count))
 
 /**
  * Number of items in the stepping table.
@@ -46,24 +70,6 @@ static const uint8_t ecma_property_hashmap_steps[ECMA_PROPERTY_HASHMAP_NUMBER_OF
 {
   3, 5, 7, 11, 13, 17, 19, 23
 };
-
-/**
- * Get the value of a bit in a bitmap.
- */
-#define ECMA_PROPERTY_HASHMAP_GET_BIT(byte_p, index) \
-  ((byte_p)[(index) >> 3] & (1 << ((index) & 0x7)))
-
-/**
- * Clear the value of a bit in a bitmap.
- */
-#define ECMA_PROPERTY_HASHMAP_CLEAR_BIT(byte_p, index) \
-  ((byte_p)[(index) >> 3] = (uint8_t) ((byte_p)[(index) >> 3] & ~(1 << ((index) & 0x7))))
-
-/**
- * Set the value of a bit in a bitmap.
- */
-#define ECMA_PROPERTY_HASHMAP_SET_BIT(byte_p, index) \
-  ((byte_p)[(index) >> 3] = (uint8_t) ((byte_p)[(index) >> 3] | (1 << ((index) & 0x7))))
 
 /**
  * Create a new property hashmap for the object.
@@ -86,21 +92,23 @@ ecma_property_hashmap_create (ecma_object_t *object_p) /**< object */
 
   uint32_t named_property_count = 0;
 
-  while (prop_iter_cp != JMEM_CP_NULL)
+  ecma_property_t *property_list_p = ECMA_GET_NON_NULL_POINTER (ecma_property_t, prop_iter_cp);
+  ecma_property_t *property_start_p = ECMA_PROPERTY_LIST_START (property_list_p);
+  ecma_property_index_t property_count = ECMA_PROPERTY_LIST_PROPERTY_COUNT (property_list_p);
+
+  for (ecma_property_index_t i = 0; i < property_count; i++)
   {
-    ecma_property_header_t *prop_iter_p = ECMA_GET_NON_NULL_POINTER (ecma_property_header_t, prop_iter_cp);
-    JERRY_ASSERT (ECMA_PROPERTY_IS_PROPERTY_PAIR (prop_iter_p));
+    ecma_property_t *curr_property_p = property_start_p + i;
 
-    for (int i = 0; i < ECMA_PROPERTY_PAIR_ITEM_COUNT; i++)
+    JERRY_ASSERT (ECMA_PROPERTY_IS_PROPERTY (curr_property_p));
+
+    if (curr_property_p->type_flags != ECMA_PROPERTY_TYPE_DELETED)
     {
-      ecma_property_types_t type = ECMA_PROPERTY_GET_TYPE (prop_iter_p->types[i]);
-
-      if (type != ECMA_PROPERTY_TYPE_SPECIAL)
+      if (ECMA_PROPERTY_IS_NAMED_PROPERTY (curr_property_p))
       {
         named_property_count++;
       }
     }
-    prop_iter_cp = prop_iter_p->next_property_cp;
   }
 
   if (named_property_count < (ECMA_PROPERTY_HASMAP_MINIMUM_SIZE / 2))
@@ -118,6 +126,7 @@ ecma_property_hashmap_create (ecma_object_t *object_p) /**< object */
   }
 
   size_t total_size = ECMA_PROPERTY_HASHMAP_GET_TOTAL_SIZE (max_property_count);
+  size_t entry_size = ECMA_PROPERTY_HASHMAP_GET_ENTRY_SIZE (max_property_count);
 
   ecma_property_hashmap_t *hashmap_p = (ecma_property_hashmap_t *) jmem_heap_alloc_block_null_on_error (total_size);
 
@@ -126,37 +135,35 @@ ecma_property_hashmap_create (ecma_object_t *object_p) /**< object */
     return;
   }
 
-  memset (hashmap_p, 0, total_size);
-
-  hashmap_p->header.types[0] = ECMA_PROPERTY_TYPE_HASHMAP;
-  hashmap_p->header.next_property_cp = object_p->u1.property_list_cp;
+  hashmap_p->type_flags = ECMA_PROPERTY_TYPE_HASHMAP;
+  hashmap_p->property_list_cp = prop_iter_cp;
   hashmap_p->max_property_count = max_property_count;
   hashmap_p->null_count = max_property_count - named_property_count;
   hashmap_p->unused_count = max_property_count - named_property_count;
 
-  jmem_cpointer_t *pair_list_p = (jmem_cpointer_t *) (hashmap_p + 1);
-  uint8_t *bits_p = (uint8_t *) (pair_list_p + max_property_count);
+  ecma_property_index_t *pair_list_p = (ecma_property_index_t *) (hashmap_p + 1);
+  memset (pair_list_p, ECMA_PROPERTY_HASHMAP_FILL_PATTERN, entry_size);
+
   uint32_t mask = max_property_count - 1;
 
-  prop_iter_cp = object_p->u1.property_list_cp;
   ECMA_SET_NON_NULL_POINTER (object_p->u1.property_list_cp, hashmap_p);
 
-  while (prop_iter_cp != JMEM_CP_NULL)
+  for (ecma_property_index_t i = 0; i < property_count; i++)
   {
-    ecma_property_header_t *prop_iter_p = ECMA_GET_NON_NULL_POINTER (ecma_property_header_t, prop_iter_cp);
-    JERRY_ASSERT (ECMA_PROPERTY_IS_PROPERTY_PAIR (prop_iter_p));
+    JERRY_ASSERT (i < ECMA_PROPERTY_HASHMAP_DIRTY_ENTRY);
 
-    for (int i = 0; i < ECMA_PROPERTY_PAIR_ITEM_COUNT; i++)
+    ecma_property_t *curr_property_p = property_start_p + i;
+
+    JERRY_ASSERT (ECMA_PROPERTY_IS_PROPERTY (curr_property_p));
+
+    if (curr_property_p->type_flags != ECMA_PROPERTY_TYPE_DELETED)
     {
-      if (!ECMA_PROPERTY_IS_NAMED_PROPERTY (prop_iter_p->types[i]))
+      if (!ECMA_PROPERTY_IS_NAMED_PROPERTY (curr_property_p))
       {
         continue;
       }
 
-      ecma_property_pair_t *property_pair_p = (ecma_property_pair_t *) prop_iter_p;
-
-      uint32_t entry_index = ecma_string_get_property_name_hash (prop_iter_p->types[i],
-                                                                 property_pair_p->names_cp[i]);
+      uint32_t entry_index = ecma_string_get_property_name_hash (curr_property_p);
       uint32_t step = ecma_property_hashmap_steps[entry_index & (ECMA_PROPERTY_HASHMAP_NUMBER_OF_STEPS - 1)];
 
       entry_index &= mask;
@@ -170,7 +177,7 @@ ecma_property_hashmap_create (ecma_object_t *object_p) /**< object */
       uint32_t start_entry_index = entry_index;
 #endif /* !JERRY_NDEBUG */
 
-      while (pair_list_p[entry_index] != ECMA_NULL_POINTER)
+      while (pair_list_p[entry_index] < ECMA_PROPERTY_HASHMAP_DIRTY_ENTRY)
       {
         entry_index = (entry_index + step) & mask;
 
@@ -179,15 +186,8 @@ ecma_property_hashmap_create (ecma_object_t *object_p) /**< object */
 #endif /* !JERRY_NDEBUG */
       }
 
-      ECMA_SET_NON_NULL_POINTER (pair_list_p[entry_index], property_pair_p);
-
-      if (i != 0)
-      {
-        ECMA_PROPERTY_HASHMAP_SET_BIT (bits_p, entry_index);
-      }
+      pair_list_p[entry_index] = i;
     }
-
-    prop_iter_cp = prop_iter_p->next_property_cp;
   }
 } /* ecma_property_hashmap_create */
 
@@ -201,14 +201,13 @@ ecma_property_hashmap_free (ecma_object_t *object_p) /**< object */
   /* Property hash must be exists and must be the first property. */
   JERRY_ASSERT (object_p->u1.property_list_cp != JMEM_CP_NULL);
 
-  ecma_property_header_t *property_p = ECMA_GET_NON_NULL_POINTER (ecma_property_header_t,
-                                                                  object_p->u1.property_list_cp);
+  ecma_property_t *property_list_p = ECMA_GET_NON_NULL_POINTER (ecma_property_t, object_p->u1.property_list_cp);
 
-  JERRY_ASSERT (property_p->types[0] == ECMA_PROPERTY_TYPE_HASHMAP);
+  JERRY_ASSERT (property_list_p->type_flags == ECMA_PROPERTY_TYPE_HASHMAP);
 
-  ecma_property_hashmap_t *hashmap_p = (ecma_property_hashmap_t *) property_p;
+  ecma_property_hashmap_t *hashmap_p = (ecma_property_hashmap_t *) property_list_p;
 
-  object_p->u1.property_list_cp = property_p->next_property_cp;
+  object_p->u1.property_list_cp = hashmap_p->property_list_cp;
 
   jmem_heap_free_block (hashmap_p,
                         ECMA_PROPERTY_HASHMAP_GET_TOTAL_SIZE (hashmap_p->max_property_count));
@@ -220,15 +219,15 @@ ecma_property_hashmap_free (ecma_object_t *object_p) /**< object */
 void
 ecma_property_hashmap_insert (ecma_object_t *object_p, /**< object */
                               ecma_string_t *name_p, /**< name of the property */
-                              ecma_property_pair_t *property_pair_p, /**< property pair */
-                              int property_index) /**< property index in the pair (0 or 1) */
+                              ecma_property_index_t index) /**< index of the property in the property list */
 {
-  JERRY_ASSERT (property_pair_p != NULL);
+  JERRY_ASSERT (object_p != NULL);
+  JERRY_ASSERT (name_p != NULL);
 
   ecma_property_hashmap_t *hashmap_p = ECMA_GET_NON_NULL_POINTER (ecma_property_hashmap_t,
                                                                   object_p->u1.property_list_cp);
 
-  JERRY_ASSERT (hashmap_p->header.types[0] == ECMA_PROPERTY_TYPE_HASHMAP);
+  JERRY_ASSERT (hashmap_p->type_flags == ECMA_PROPERTY_TYPE_HASHMAP);
 
   /* The NULLs are reduced below 1/8 of the hashmap. */
   if (hashmap_p->null_count < (hashmap_p->max_property_count >> 3))
@@ -237,8 +236,6 @@ ecma_property_hashmap_insert (ecma_object_t *object_p, /**< object */
     ecma_property_hashmap_create (object_p);
     return;
   }
-
-  JERRY_ASSERT (property_index < ECMA_PROPERTY_PAIR_ITEM_COUNT);
 
   uint32_t entry_index = ecma_string_hash (name_p);
   uint32_t step = ecma_property_hashmap_steps[entry_index & (ECMA_PROPERTY_HASHMAP_NUMBER_OF_STEPS - 1)];
@@ -250,9 +247,9 @@ ecma_property_hashmap_insert (ecma_object_t *object_p, /**< object */
   uint32_t start_entry_index = entry_index;
 #endif /* !JERRY_NDEBUG */
 
-  jmem_cpointer_t *pair_list_p = (jmem_cpointer_t *) (hashmap_p + 1);
+  ecma_property_index_t *pair_list_p = (ecma_property_index_t *) (hashmap_p + 1);
 
-  while (pair_list_p[entry_index] != ECMA_NULL_POINTER)
+  while (pair_list_p[entry_index] < ECMA_PROPERTY_HASHMAP_DIRTY_ENTRY)
   {
     entry_index = (entry_index + step) & mask;
 
@@ -261,13 +258,7 @@ ecma_property_hashmap_insert (ecma_object_t *object_p, /**< object */
 #endif /* !JERRY_NDEBUG */
   }
 
-  ECMA_SET_NON_NULL_POINTER (pair_list_p[entry_index], property_pair_p);
-
-  uint8_t *bits_p = (uint8_t *) (pair_list_p + hashmap_p->max_property_count);
-  bits_p += (entry_index >> 3);
-  mask = (uint32_t) (1 << (entry_index & 0x7));
-
-  if (!(*bits_p & mask))
+  if (pair_list_p[entry_index] == ECMA_PROPERTY_HASHMAP_CLEAN_ENTRY)
   {
     /* Deleted entries also has ECMA_NULL_POINTER
      * value, but they are not NULL values. */
@@ -278,14 +269,7 @@ ecma_property_hashmap_insert (ecma_object_t *object_p, /**< object */
   hashmap_p->unused_count--;
   JERRY_ASSERT (hashmap_p->unused_count > 0);
 
-  if (property_index == 0)
-  {
-    *bits_p = (uint8_t) ((*bits_p) & ~mask);
-  }
-  else
-  {
-    *bits_p = (uint8_t) ((*bits_p) | mask);
-  }
+  pair_list_p[entry_index] = index;
 } /* ecma_property_hashmap_insert */
 
 /**
@@ -296,13 +280,12 @@ ecma_property_hashmap_insert (ecma_object_t *object_p, /**< object */
  */
 ecma_property_hashmap_delete_status
 ecma_property_hashmap_delete (ecma_object_t *object_p, /**< object */
-                              jmem_cpointer_t name_cp, /**< property name */
                               ecma_property_t *property_p) /**< property */
 {
   ecma_property_hashmap_t *hashmap_p = ECMA_GET_NON_NULL_POINTER (ecma_property_hashmap_t,
                                                                   object_p->u1.property_list_cp);
 
-  JERRY_ASSERT (hashmap_p->header.types[0] == ECMA_PROPERTY_TYPE_HASHMAP);
+  JERRY_ASSERT (hashmap_p->type_flags == ECMA_PROPERTY_TYPE_HASHMAP);
 
   hashmap_p->unused_count++;
 
@@ -312,11 +295,10 @@ ecma_property_hashmap_delete (ecma_object_t *object_p, /**< object */
     return ECMA_PROPERTY_HASHMAP_DELETE_RECREATE_HASHMAP;
   }
 
-  uint32_t entry_index = ecma_string_get_property_name_hash (*property_p, name_cp);
+  uint32_t entry_index = ecma_string_get_property_name_hash (property_p);
   uint32_t step = ecma_property_hashmap_steps[entry_index & (ECMA_PROPERTY_HASHMAP_NUMBER_OF_STEPS - 1)];
   uint32_t mask = hashmap_p->max_property_count - 1;
-  jmem_cpointer_t *pair_list_p = (jmem_cpointer_t *) (hashmap_p + 1);
-  uint8_t *bits_p = (uint8_t *) (pair_list_p + hashmap_p->max_property_count);
+  ecma_property_index_t *pair_list_p = (ecma_property_index_t *) (hashmap_p + 1);
 
   entry_index &= mask;
 
@@ -325,33 +307,24 @@ ecma_property_hashmap_delete (ecma_object_t *object_p, /**< object */
   uint32_t start_entry_index = entry_index;
 #endif /* !JERRY_NDEBUG */
 
+  ecma_property_t *property_list_p = ECMA_GET_NON_NULL_POINTER (ecma_property_t, hashmap_p->property_list_cp);
+  ecma_property_t *property_start_p = ECMA_PROPERTY_LIST_START (property_list_p);
+
   while (true)
   {
-    if (pair_list_p[entry_index] != ECMA_NULL_POINTER)
+    if (pair_list_p[entry_index] < ECMA_PROPERTY_HASHMAP_DIRTY_ENTRY)
     {
-      size_t offset = 0;
+      ecma_property_index_t property_index = pair_list_p[entry_index];
 
-      if (ECMA_PROPERTY_HASHMAP_GET_BIT (bits_p, entry_index))
+      ecma_property_t *curr_property_p = property_start_p + property_index;
+
+      if (curr_property_p == property_p)
       {
-        offset = 1;
-      }
+        JERRY_ASSERT (curr_property_p->name_cp == property_p->name_cp);
 
-      ecma_property_pair_t *property_pair_p = ECMA_GET_NON_NULL_POINTER (ecma_property_pair_t,
-                                                                         pair_list_p[entry_index]);
-
-      if ((property_pair_p->header.types + offset) == property_p)
-      {
-        JERRY_ASSERT (property_pair_p->names_cp[offset] == name_cp);
-
-        pair_list_p[entry_index] = ECMA_NULL_POINTER;
-        ECMA_PROPERTY_HASHMAP_SET_BIT (bits_p, entry_index);
+        pair_list_p[entry_index] = ECMA_PROPERTY_HASHMAP_DIRTY_ENTRY;
         return ECMA_PROPERTY_HASHMAP_DELETE_HAS_HASHMAP;
       }
-    }
-    else
-    {
-      /* Must be a deleted entry. */
-      JERRY_ASSERT (ECMA_PROPERTY_HASHMAP_GET_BIT (bits_p, entry_index));
     }
 
     entry_index = (entry_index + step) & mask;
@@ -370,8 +343,18 @@ ecma_property_hashmap_delete (ecma_object_t *object_p, /**< object */
 ecma_property_t *
 ecma_property_hashmap_find (ecma_property_hashmap_t *hashmap_p, /**< hashmap */
                             ecma_string_t *name_p, /**< property name */
-                            jmem_cpointer_t *property_real_name_cp) /**< [out] property real name */
+                            jmem_cpointer_t *property_real_name_cp, /**< [out] property real name */
+                            ecma_property_index_t *property_index) /**< [out] index of property */
 {
+  JERRY_ASSERT (hashmap_p != NULL);
+  JERRY_ASSERT (name_p != NULL);
+  JERRY_ASSERT (property_index != NULL);
+
+  JERRY_ASSERT (hashmap_p->property_list_cp != JMEM_CP_NULL);
+
+  ecma_property_t *property_list_p = ECMA_GET_NON_NULL_POINTER (ecma_property_t, hashmap_p->property_list_cp);
+  ecma_property_t *property_start_p = ECMA_PROPERTY_LIST_START (property_list_p);
+
 #ifndef JERRY_NDEBUG
   /* A sanity check in debug mode: a named property must be present
    * in both the property hashmap and in the property chain, or missing
@@ -379,22 +362,18 @@ ecma_property_hashmap_find (ecma_property_hashmap_t *hashmap_p, /**< hashmap */
    * chain, and sets the property_found variable. */
   bool property_found = false;
 
-  jmem_cpointer_t prop_iter_cp = hashmap_p->header.next_property_cp;
+  ecma_property_index_t property_count = ECMA_PROPERTY_LIST_PROPERTY_COUNT (property_list_p);
 
-  while (prop_iter_cp != JMEM_CP_NULL && !property_found)
+  for (ecma_property_index_t i = 0; i < property_count; i++)
   {
-    ecma_property_header_t *prop_iter_p = ECMA_GET_NON_NULL_POINTER (ecma_property_header_t, prop_iter_cp);
-    JERRY_ASSERT (ECMA_PROPERTY_IS_PROPERTY_PAIR (prop_iter_p));
+    ecma_property_t *curr_property_p = property_start_p + i;
+    JERRY_ASSERT (ECMA_PROPERTY_IS_PROPERTY (curr_property_p));
 
-    ecma_property_pair_t *prop_pair_p = (ecma_property_pair_t *) prop_iter_p;
-
-    for (int i = 0; i < ECMA_PROPERTY_PAIR_ITEM_COUNT; i++)
+    if (curr_property_p->type_flags != ECMA_PROPERTY_TYPE_DELETED)
     {
-      if (ECMA_PROPERTY_IS_NAMED_PROPERTY (prop_iter_p->types[i]))
+      if (ECMA_PROPERTY_IS_NAMED_PROPERTY (curr_property_p))
       {
-        if (ecma_string_compare_to_property_name (prop_iter_p->types[i],
-                                                  prop_pair_p->names_cp[i],
-                                                  name_p))
+        if (ecma_string_compare_to_property_name (curr_property_p, name_p))
         {
           /* Property is found */
           property_found = true;
@@ -402,16 +381,13 @@ ecma_property_hashmap_find (ecma_property_hashmap_t *hashmap_p, /**< hashmap */
         }
       }
     }
-
-    prop_iter_cp = prop_iter_p->next_property_cp;
   }
 #endif /* !JERRY_NDEBUG */
 
   uint32_t entry_index = ecma_string_hash (name_p);
   uint32_t step = ecma_property_hashmap_steps[entry_index & (ECMA_PROPERTY_HASHMAP_NUMBER_OF_STEPS - 1)];
   uint32_t mask = hashmap_p->max_property_count - 1;
-  jmem_cpointer_t *pair_list_p = (jmem_cpointer_t *) (hashmap_p + 1);
-  uint8_t *bits_p = (uint8_t *) (pair_list_p + hashmap_p->max_property_count);
+  ecma_property_index_t *pair_list_p = (ecma_property_index_t *) (hashmap_p + 1);
   entry_index &= mask;
 
 #ifndef JERRY_NDEBUG
@@ -421,50 +397,44 @@ ecma_property_hashmap_find (ecma_property_hashmap_t *hashmap_p, /**< hashmap */
 
   if (ECMA_IS_DIRECT_STRING (name_p))
   {
-    ecma_property_t prop_name_type = (ecma_property_t) ECMA_GET_DIRECT_STRING_TYPE (name_p);
+    uint8_t prop_name_type = (uint8_t) ECMA_GET_DIRECT_STRING_TYPE (name_p);
     jmem_cpointer_t property_name_cp = (jmem_cpointer_t) ECMA_GET_DIRECT_STRING_VALUE (name_p);
 
     JERRY_ASSERT (prop_name_type > 0);
 
     while (true)
     {
-      if (pair_list_p[entry_index] != ECMA_NULL_POINTER)
+      ecma_property_index_t index = pair_list_p[entry_index];
+
+      if (index != ECMA_PROPERTY_HASHMAP_CLEAN_ENTRY)
       {
-        size_t offset = 0;
-        if (ECMA_PROPERTY_HASHMAP_GET_BIT (bits_p, entry_index))
+        if (index != ECMA_PROPERTY_HASHMAP_DIRTY_ENTRY)
         {
-          offset = 1;
-        }
+          ecma_property_t *curr_property_p = property_start_p + index;
 
-        ecma_property_pair_t *property_pair_p = ECMA_GET_NON_NULL_POINTER (ecma_property_pair_t,
-                                                                           pair_list_p[entry_index]);
+          JERRY_ASSERT (ECMA_PROPERTY_IS_NAMED_PROPERTY (curr_property_p));
 
-        ecma_property_t *property_p = property_pair_p->header.types + offset;
+          if (curr_property_p->name_cp == property_name_cp
+              && ECMA_PROPERTY_GET_NAME_TYPE (curr_property_p) == prop_name_type)
+          {
+  #ifndef JERRY_NDEBUG
+            JERRY_ASSERT (property_found);
+  #endif /* !JERRY_NDEBUG */
 
-        JERRY_ASSERT (ECMA_PROPERTY_IS_NAMED_PROPERTY (*property_p));
+            *property_real_name_cp = property_name_cp;
+            *property_index = index;
 
-        if (property_pair_p->names_cp[offset] == property_name_cp
-            && ECMA_PROPERTY_GET_NAME_TYPE (*property_p) == prop_name_type)
-        {
-#ifndef JERRY_NDEBUG
-          JERRY_ASSERT (property_found);
-#endif /* !JERRY_NDEBUG */
-
-          *property_real_name_cp = property_name_cp;
-          return property_p;
+            return curr_property_p;
+          }
         }
       }
       else
       {
-        if (!ECMA_PROPERTY_HASHMAP_GET_BIT (bits_p, entry_index))
-        {
 #ifndef JERRY_NDEBUG
-          JERRY_ASSERT (!property_found);
+        JERRY_ASSERT (!property_found);
 #endif /* !JERRY_NDEBUG */
 
-          return NULL;
-        }
-        /* Otherwise it is a deleted entry. */
+        return NULL;
       }
 
       entry_index = (entry_index + step) & mask;
@@ -477,47 +447,41 @@ ecma_property_hashmap_find (ecma_property_hashmap_t *hashmap_p, /**< hashmap */
 
   while (true)
   {
-    if (pair_list_p[entry_index] != ECMA_NULL_POINTER)
+    ecma_property_index_t index = pair_list_p[entry_index];
+
+    if (index != ECMA_PROPERTY_HASHMAP_CLEAN_ENTRY)
     {
-      size_t offset = 0;
-      if (ECMA_PROPERTY_HASHMAP_GET_BIT (bits_p, entry_index))
+      if (index != ECMA_PROPERTY_HASHMAP_DIRTY_ENTRY)
       {
-        offset = 1;
-      }
+        ecma_property_t *curr_property_p = property_start_p + index;
 
-      ecma_property_pair_t *property_pair_p = ECMA_GET_NON_NULL_POINTER (ecma_property_pair_t,
-                                                                         pair_list_p[entry_index]);
+        JERRY_ASSERT (ECMA_PROPERTY_IS_NAMED_PROPERTY (curr_property_p));
 
-      ecma_property_t *property_p = property_pair_p->header.types + offset;
-
-      JERRY_ASSERT (ECMA_PROPERTY_IS_NAMED_PROPERTY (*property_p));
-
-      if (ECMA_PROPERTY_GET_NAME_TYPE (*property_p) == ECMA_DIRECT_STRING_PTR)
-      {
-        ecma_string_t *prop_name_p = ECMA_GET_NON_NULL_POINTER (ecma_string_t, property_pair_p->names_cp[offset]);
-
-        if (ecma_compare_ecma_non_direct_strings (prop_name_p, name_p))
+        if (ECMA_PROPERTY_GET_NAME_TYPE (curr_property_p) == ECMA_DIRECT_STRING_PTR)
         {
+          ecma_string_t *prop_name_p = ECMA_GET_NON_NULL_POINTER (ecma_string_t, curr_property_p->name_cp);
+
+          if (ecma_compare_ecma_non_direct_strings (prop_name_p, name_p))
+          {
 #ifndef JERRY_NDEBUG
-          JERRY_ASSERT (property_found);
+            JERRY_ASSERT (property_found);
 #endif /* !JERRY_NDEBUG */
 
-          *property_real_name_cp = property_pair_p->names_cp[offset];
-          return property_p;
+            *property_real_name_cp = curr_property_p->name_cp;
+            *property_index = index;
+
+            return curr_property_p;
+          }
         }
       }
     }
     else
     {
-      if (!ECMA_PROPERTY_HASHMAP_GET_BIT (bits_p, entry_index))
-      {
 #ifndef JERRY_NDEBUG
-        JERRY_ASSERT (!property_found);
+      JERRY_ASSERT (!property_found);
 #endif /* !JERRY_NDEBUG */
 
-        return NULL;
-      }
-      /* Otherwise it is a deleted entry. */
+      return NULL;
     }
 
     entry_index = (entry_index + step) & mask;

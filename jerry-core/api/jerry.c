@@ -2153,7 +2153,7 @@ jerry_has_internal_property (const jerry_value_t obj_val, /**< object value */
     return false;
   }
 
-  ecma_object_t *internal_object_p = ecma_get_object_from_value (ECMA_PROPERTY_VALUE_PTR (property_p)->value);
+  ecma_object_t *internal_object_p = ecma_get_object_from_value (property_p->u.value);
   property_p = ecma_find_named_property (internal_object_p, ecma_get_prop_name_from_value (prop_name_val));
 
   return property_p != NULL;
@@ -2260,7 +2260,7 @@ jerry_delete_internal_property (const jerry_value_t obj_val, /**< object value *
     return true;
   }
 
-  ecma_object_t *internal_object_p = ecma_get_object_from_value (ECMA_PROPERTY_VALUE_PTR (property_p)->value);
+  ecma_object_t *internal_object_p = ecma_get_object_from_value (property_p->u.value);
   property_p = ecma_find_named_property (internal_object_p, ecma_get_prop_name_from_value (prop_name_val));
 
   if (property_p == NULL)
@@ -2268,7 +2268,7 @@ jerry_delete_internal_property (const jerry_value_t obj_val, /**< object value *
     return true;
   }
 
-  ecma_delete_property (internal_object_p, ECMA_PROPERTY_VALUE_PTR (property_p));
+  ecma_delete_property (internal_object_p, property_p);
 
   return true;
 } /* jerry_delete_internal_property */
@@ -2362,7 +2362,7 @@ jerry_get_internal_property (const jerry_value_t obj_val, /**< object value */
     return jerry_return (ECMA_VALUE_UNDEFINED);
   }
 
-  ecma_object_t *internal_object_p = ecma_get_object_from_value (ECMA_PROPERTY_VALUE_PTR (property_p)->value);
+  ecma_object_t *internal_object_p = ecma_get_object_from_value (property_p->u.value);
   property_p = ecma_find_named_property (internal_object_p, ecma_get_prop_name_from_value (prop_name_val));
 
   if (property_p == NULL)
@@ -2370,7 +2370,7 @@ jerry_get_internal_property (const jerry_value_t obj_val, /**< object value */
     return jerry_return (ECMA_VALUE_UNDEFINED);
   }
 
-  return jerry_return (ecma_copy_value (ECMA_PROPERTY_VALUE_PTR (property_p)->value));
+  return jerry_return (ecma_copy_value (property_p->u.value));
 } /* jerry_get_internal_property */
 
 /**
@@ -2470,10 +2470,9 @@ jerry_set_internal_property (const jerry_value_t obj_val, /**< object value */
 
   if (property_p == NULL)
   {
-    ecma_property_value_t *value_p = ecma_create_named_data_property (obj_p,
-                                                                      internal_string_p,
-                                                                      ECMA_PROPERTY_CONFIGURABLE_ENUMERABLE_WRITABLE,
-                                                                      NULL);
+    property_p = ecma_create_named_data_property (obj_p,
+                                                  internal_string_p,
+                                                  ECMA_PROPERTY_CONFIGURABLE_ENUMERABLE_WRITABLE);
 
     internal_object_p = ecma_create_object (NULL,
                                             sizeof (ecma_extended_object_t),
@@ -2485,12 +2484,12 @@ jerry_set_internal_property (const jerry_value_t obj_val, /**< object value */
       container_p->u.class_prop.u.length = 0;
     }
 
-    value_p->value = ecma_make_object_value (internal_object_p);
+    property_p->u.value = ecma_make_object_value (internal_object_p);
     ecma_deref_object (internal_object_p);
   }
   else
   {
-    internal_object_p = ecma_get_object_from_value (ECMA_PROPERTY_VALUE_PTR (property_p)->value);
+    internal_object_p = ecma_get_object_from_value (property_p->u.value);
   }
 
   ecma_string_t *prop_name_p = ecma_get_prop_name_from_value (prop_name_val);
@@ -2498,16 +2497,15 @@ jerry_set_internal_property (const jerry_value_t obj_val, /**< object value */
 
   if (property_p == NULL)
   {
-    ecma_property_value_t *value_p = ecma_create_named_data_property (internal_object_p,
-                                                                      prop_name_p,
-                                                                      ECMA_PROPERTY_CONFIGURABLE_ENUMERABLE_WRITABLE,
-                                                                      NULL);
+    property_p = ecma_create_named_data_property (internal_object_p,
+                                                  prop_name_p,
+                                                  ECMA_PROPERTY_CONFIGURABLE_ENUMERABLE_WRITABLE);
 
-    value_p->value = ecma_copy_value_if_not_object (value_to_set);
+    property_p->u.value = ecma_copy_value_if_not_object (value_to_set);
   }
   else
   {
-    ecma_named_data_property_assign_value (internal_object_p, ECMA_PROPERTY_VALUE_PTR (property_p), value_to_set);
+    ecma_named_data_property_assign_value (internal_object_p, property_p, value_to_set);
   }
 
   return true;

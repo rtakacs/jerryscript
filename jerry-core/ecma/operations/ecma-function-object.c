@@ -1316,28 +1316,25 @@ ecma_op_lazy_instantiate_prototype_object (ecma_object_t *object_p) /**< the fun
   /* 17. */
   if (init_constructor)
   {
-    ecma_property_value_t *constructor_prop_value_p;
-    constructor_prop_value_p = ecma_create_named_data_property (proto_object_p,
-                                                                ecma_get_magic_string (LIT_MAGIC_STRING_CONSTRUCTOR),
-                                                                ECMA_PROPERTY_CONFIGURABLE_WRITABLE,
-                                                                NULL);
+    ecma_property_t *constructor_property_p;
+    constructor_property_p = ecma_create_named_data_property (proto_object_p,
+                                                              ecma_get_magic_string (LIT_MAGIC_STRING_CONSTRUCTOR),
+                                                              ECMA_PROPERTY_CONFIGURABLE_WRITABLE);
 
-    constructor_prop_value_p->value = ecma_make_object_value (object_p);
+    constructor_property_p->u.value = ecma_make_object_value (object_p);
   }
 
   /* 18. */
-  ecma_property_t *prototype_prop_p;
-  ecma_property_value_t *prototype_prop_value_p;
-  prototype_prop_value_p = ecma_create_named_data_property (object_p,
-                                                            ecma_get_magic_string (LIT_MAGIC_STRING_PROTOTYPE),
-                                                            ECMA_PROPERTY_FLAG_WRITABLE,
-                                                            &prototype_prop_p);
+  ecma_property_t *prototype_property_p;
+  prototype_property_p = ecma_create_named_data_property (object_p,
+                                                          ecma_get_magic_string (LIT_MAGIC_STRING_PROTOTYPE),
+                                                          ECMA_PROPERTY_FLAG_WRITABLE);
 
-  prototype_prop_value_p->value = ecma_make_object_value (proto_object_p);
+  prototype_property_p->u.value = ecma_make_object_value (proto_object_p);
 
   ecma_deref_object (proto_object_p);
 
-  return prototype_prop_p;
+  return prototype_property_p;
 } /* ecma_op_lazy_instantiate_prototype_object */
 
 /**
@@ -1379,13 +1376,11 @@ ecma_op_function_try_to_lazy_instantiate_property (ecma_object_t *object_p, /**<
 
       /* Set tag bit to represent initialized 'length' property */
       ECMA_SET_FIRST_BIT_TO_POINTER_TAG (ext_func_p->u.function.scope_cp);
-      ecma_property_t *value_prop_p;
-      ecma_property_value_t *value_p = ecma_create_named_data_property (object_p,
-                                                                        property_name_p,
-                                                                        ECMA_PROPERTY_FLAG_CONFIGURABLE,
-                                                                        &value_prop_p);
-      value_p->value = ecma_make_uint32_value (len);
-      return value_prop_p;
+      ecma_property_t *property_p = ecma_create_named_data_property (object_p,
+                                                                     property_name_p,
+                                                                     ECMA_PROPERTY_FLAG_CONFIGURABLE);
+      property_p->u.value = ecma_make_uint32_value (len);
+      return property_p;
     }
 
     return NULL;
@@ -1407,29 +1402,24 @@ ecma_op_function_try_to_lazy_instantiate_property (ecma_object_t *object_p, /**<
 #if ENABLED (JERRY_ES2015)
     if (!(bytecode_data_p->status_flags & CBC_CODE_FLAGS_STRICT_MODE))
     {
-      ecma_property_t *value_prop_p;
-      /* The property_name_p argument contans the name. */
-      ecma_property_value_t *value_p = ecma_create_named_data_property (object_p,
-                                                                        property_name_p,
-                                                                        ECMA_PROPERTY_FIXED,
-                                                                        &value_prop_p);
-      value_p->value = ECMA_VALUE_NULL;
-      return value_prop_p;
+      /* The property_name_p argument contains the name. */
+      ecma_property_t *property_p = ecma_create_named_data_property (object_p,
+                                                                     property_name_p,
+                                                                     ECMA_PROPERTY_FIXED);
+      property_p->u.value = ECMA_VALUE_NULL;
+      return property_p;
     }
 #else /* !ENABLED (JERRY_ES2015) */
     if (bytecode_data_p->status_flags & CBC_CODE_FLAGS_STRICT_MODE)
     {
       ecma_object_t *thrower_p = ecma_builtin_get (ECMA_BUILTIN_ID_TYPE_ERROR_THROWER);
 
-      ecma_property_t *caller_prop_p;
-      /* The property_name_p argument contans the name. */
-      ecma_create_named_accessor_property (object_p,
-                                           property_name_p,
-                                           thrower_p,
-                                           thrower_p,
-                                           ECMA_PROPERTY_FIXED,
-                                           &caller_prop_p);
-      return caller_prop_p;
+      /* The property_name_p argument contains the name. */
+      return ecma_create_named_accessor_property (object_p,
+                                                  property_name_p,
+                                                  thrower_p,
+                                                  thrower_p,
+                                                  ECMA_PROPERTY_FIXED);
     }
 #endif /* ENABLED (JERRY_ES2015) */
 
@@ -1524,14 +1514,12 @@ ecma_op_bound_function_try_to_lazy_instantiate_property (ecma_object_t *object_p
       length = 0;
     }
 
-    ecma_property_t *len_prop_p;
-    ecma_property_value_t *len_prop_value_p = ecma_create_named_data_property (object_p,
-                                                                               property_name_p,
-                                                                               length_attributes,
-                                                                               &len_prop_p);
+    ecma_property_t *length_property_p = ecma_create_named_data_property (object_p,
+                                                                          property_name_p,
+                                                                          length_attributes);
 
-    len_prop_value_p->value = ecma_make_integer_value (length);
-    return len_prop_p;
+    length_property_p->u.value = ecma_make_integer_value (length);
+    return length_property_p;
   }
 
   if (ecma_compare_ecma_string_to_magic_id (property_name_p, LIT_MAGIC_STRING_CALLER)
@@ -1539,15 +1527,12 @@ ecma_op_bound_function_try_to_lazy_instantiate_property (ecma_object_t *object_p
   {
     ecma_object_t *thrower_p = ecma_builtin_get (ECMA_BUILTIN_ID_TYPE_ERROR_THROWER);
 
-    ecma_property_t *caller_prop_p;
     /* The string_p argument contans the name. */
-    ecma_create_named_accessor_property (object_p,
-                                         property_name_p,
-                                         thrower_p,
-                                         thrower_p,
-                                         ECMA_PROPERTY_FIXED,
-                                         &caller_prop_p);
-    return caller_prop_p;
+    return ecma_create_named_accessor_property (object_p,
+                                                property_name_p,
+                                                thrower_p,
+                                                thrower_p,
+                                                ECMA_PROPERTY_FIXED);
   }
 
   return NULL;

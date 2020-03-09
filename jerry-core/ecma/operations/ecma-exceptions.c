@@ -146,15 +146,14 @@ ecma_new_standard_error (ecma_standard_error_t error_type) /**< native error typ
 
   ecma_string_t *stack_str_p = ecma_new_ecma_string_from_utf8 ((const lit_utf8_byte_t *) stack_id_p, 5);
 
-  ecma_property_value_t *prop_value_p = ecma_create_named_data_property (new_error_obj_p,
-                                                                         stack_str_p,
-                                                                         ECMA_PROPERTY_CONFIGURABLE_WRITABLE,
-                                                                         NULL);
+  ecma_property_t *property_p = ecma_create_named_data_property (new_error_obj_p,
+                                                                 stack_str_p,
+                                                                 ECMA_PROPERTY_CONFIGURABLE_WRITABLE);
   ecma_deref_ecma_string (stack_str_p);
 
   ecma_value_t backtrace_value = vm_get_backtrace (0);
 
-  prop_value_p->value = backtrace_value;
+  property_p->u.value = backtrace_value;
   ecma_deref_object (ecma_get_object_from_value (backtrace_value));
 #endif /* ENABLED (JERRY_LINE_INFO) */
 
@@ -202,14 +201,12 @@ ecma_new_standard_error_with_message (ecma_standard_error_t error_type, /**< nat
 {
   ecma_object_t *new_error_obj_p = ecma_new_standard_error (error_type);
 
-  ecma_property_value_t *prop_value_p;
-  prop_value_p = ecma_create_named_data_property (new_error_obj_p,
-                                                  ecma_get_magic_string (LIT_MAGIC_STRING_MESSAGE),
-                                                  ECMA_PROPERTY_CONFIGURABLE_WRITABLE,
-                                                  NULL);
+  ecma_property_t *property_p = ecma_create_named_data_property (new_error_obj_p,
+                                                                 ecma_get_magic_string (LIT_MAGIC_STRING_MESSAGE),
+                                                                 ECMA_PROPERTY_CONFIGURABLE_WRITABLE);
 
   ecma_ref_ecma_string (message_string_p);
-  prop_value_p->value = ecma_make_string_value (message_string_p);
+  property_p->u.value = ecma_make_string_value (message_string_p);
 
   return new_error_obj_p;
 } /* ecma_new_standard_error_with_message */

@@ -116,9 +116,9 @@ vm_op_get_value (ecma_value_t object, /**< base object */
       ecma_property_t *property_p = ecma_lcache_lookup (object_p, property_name_p);
 
       if (property_p != NULL &&
-          ECMA_PROPERTY_GET_TYPE (*property_p) == ECMA_PROPERTY_TYPE_NAMEDDATA)
+          ECMA_PROPERTY_GET_TYPE (property_p) == ECMA_PROPERTY_TYPE_NAMEDDATA)
       {
-        return ecma_fast_copy_value (ECMA_PROPERTY_VALUE_PTR (property_p)->value);
+        return ecma_fast_copy_value (property_p->u.value);
       }
 #endif /* ENABLED (JERRY_LCACHE) */
 
@@ -1292,15 +1292,15 @@ vm_loop (vm_frame_ctx_t *frame_ctx_p) /**< frame context */
             prop_attributes = ECMA_PROPERTY_FLAG_ENUMERABLE;
           }
 
-          ecma_property_value_t *property_value_p;
-          property_value_p = ecma_create_named_data_property (frame_ctx_p->lex_env_p, name_p, prop_attributes, NULL);
+          ecma_property_t *property_p;
+          property_p = ecma_create_named_data_property (frame_ctx_p->lex_env_p, name_p, prop_attributes);
 
           if (opcode != CBC_CREATE_VAR)
           {
-            property_value_p->value = ECMA_VALUE_UNINITIALIZED;
+            property_p->u.value = ECMA_VALUE_UNINITIALIZED;
           }
 #else /* !ENABLED (JERRY_ES2015) */
-          ecma_create_named_data_property (frame_ctx_p->lex_env_p, name_p, prop_attributes, NULL);
+          ecma_create_named_data_property (frame_ctx_p->lex_env_p, name_p, prop_attributes);
 #endif /* ENABLED (JERRY_ES2015) */
 
           continue;
@@ -1331,7 +1331,7 @@ vm_loop (vm_frame_ctx_t *frame_ctx_p) /**< frame context */
             {
               ecma_property_t *property_p = ecma_find_named_property (lex_env_p, name_p);
 
-              JERRY_ASSERT (property_p == NULL || !(*property_p & ECMA_PROPERTY_FLAG_ENUMERABLE));
+              JERRY_ASSERT (property_p == NULL || ((property_p->type_flags & ECMA_PROPERTY_FLAG_ENUMERABLE) == 0));
             }
   #endif /* ENABLED (JERRY_ES2015) && !JERRY_NDEBUG */
 
@@ -1344,7 +1344,7 @@ vm_loop (vm_frame_ctx_t *frame_ctx_p) /**< frame context */
           {
             ecma_property_t *property_p = ecma_find_named_property (lex_env_p, name_p);
 
-            JERRY_ASSERT (property_p == NULL || !(*property_p & ECMA_PROPERTY_FLAG_ENUMERABLE));
+            JERRY_ASSERT (property_p == NULL || ((property_p->type_flags & ECMA_PROPERTY_FLAG_ENUMERABLE) == 0));
           }
   #endif /* ENABLED (JERRY_ES2015) && !JERRY_NDEBUG */
 
@@ -1401,14 +1401,12 @@ vm_loop (vm_frame_ctx_t *frame_ctx_p) /**< frame context */
           JERRY_ASSERT (ecma_get_lex_env_type (frame_ctx_p->lex_env_p) == ECMA_LEXICAL_ENVIRONMENT_DECLARATIVE);
           JERRY_ASSERT (ecma_find_named_property (frame_ctx_p->lex_env_p, name_p) == NULL);
 
-          ecma_property_value_t *property_value_p;
-          property_value_p = ecma_create_named_data_property (frame_ctx_p->lex_env_p,
-                                                              name_p,
-                                                              ECMA_PROPERTY_FLAG_WRITABLE,
-                                                              NULL);
+          ecma_property_t *property_p = ecma_create_named_data_property (frame_ctx_p->lex_env_p,
+                                                                         name_p,
+                                                                         ECMA_PROPERTY_FLAG_WRITABLE);
 
-          JERRY_ASSERT (property_value_p->value == ECMA_VALUE_UNDEFINED);
-          property_value_p->value = lit_value;
+          JERRY_ASSERT (property_p->u.value == ECMA_VALUE_UNDEFINED);
+          property_p->u.value = lit_value;
 
           if (value_index >= register_end)
           {
@@ -1495,10 +1493,10 @@ vm_loop (vm_frame_ctx_t *frame_ctx_p) /**< frame context */
           ecma_property_t *property_p = ecma_find_named_property (frame_ctx_p->lex_env_p, name_p);
 
           JERRY_ASSERT (property_p != NULL
-                        && ECMA_PROPERTY_GET_TYPE (*property_p) == ECMA_PROPERTY_TYPE_NAMEDDATA);
-          JERRY_ASSERT (ECMA_PROPERTY_VALUE_PTR (property_p)->value == ECMA_VALUE_UNINITIALIZED);
+                        && ECMA_PROPERTY_GET_TYPE (property_p) == ECMA_PROPERTY_TYPE_NAMEDDATA);
+          JERRY_ASSERT (property_p->u.value == ECMA_VALUE_UNINITIALIZED);
 
-          ECMA_PROPERTY_VALUE_PTR (property_p)->value = left_value;
+          property_p->u.value = left_value;
 
           if (ecma_is_value_object (left_value))
           {
@@ -1521,7 +1519,7 @@ vm_loop (vm_frame_ctx_t *frame_ctx_p) /**< frame context */
             {
               ecma_property_t *property_p = ecma_find_named_property (lex_env_p, name_p);
 
-              JERRY_ASSERT (property_p == NULL || !(*property_p & ECMA_PROPERTY_FLAG_ENUMERABLE));
+              JERRY_ASSERT (property_p == NULL || ((property_p->type_flags & ECMA_PROPERTY_FLAG_ENUMERABLE) == 0));
             }
 #endif /* !JERRY_NDEBUG */
 
@@ -1532,24 +1530,21 @@ vm_loop (vm_frame_ctx_t *frame_ctx_p) /**< frame context */
           if (ecma_get_lex_env_type (lex_env_p) == ECMA_LEXICAL_ENVIRONMENT_DECLARATIVE)
           {
             ecma_property_t *property_p = ecma_find_named_property (lex_env_p, name_p);
-            ecma_property_value_t *prop_value_p;
 
             if (property_p == NULL)
             {
-              prop_value_p = ecma_create_named_data_property (lex_env_p,
-                                                              name_p,
-                                                              ECMA_PROPERTY_FLAG_WRITABLE,
-                                                              NULL);
+              property_p = ecma_create_named_data_property (lex_env_p,
+                                                            name_p,
+                                                            ECMA_PROPERTY_FLAG_WRITABLE);
             }
             else
             {
 #ifndef JERRY_NDEBUG
-              JERRY_ASSERT (!(*property_p & ECMA_PROPERTY_FLAG_ENUMERABLE));
+              JERRY_ASSERT ((property_p->type_flags & ECMA_PROPERTY_FLAG_ENUMERABLE) == 0);
 #endif /* !JERRY_NDEBUG */
-              prop_value_p = ECMA_PROPERTY_VALUE_PTR (property_p);
             }
 
-            ecma_named_data_property_assign_value (lex_env_p, prop_value_p, left_value);
+            ecma_named_data_property_assign_value (lex_env_p, property_p, left_value);
           }
           else
           {
@@ -1630,27 +1625,20 @@ vm_loop (vm_frame_ctx_t *frame_ctx_p) /**< frame context */
           ecma_property_t *property_p = ecma_find_named_property (object_p, prop_name_p);
 
           if (property_p != NULL
-              && ECMA_PROPERTY_GET_TYPE (*property_p) != ECMA_PROPERTY_TYPE_NAMEDDATA)
+              && ECMA_PROPERTY_GET_TYPE (property_p) != ECMA_PROPERTY_TYPE_NAMEDDATA)
           {
-            ecma_delete_property (object_p, ECMA_PROPERTY_VALUE_PTR (property_p));
+            ecma_delete_property (object_p, property_p);
             property_p = NULL;
           }
 
-          ecma_property_value_t *prop_value_p;
-
           if (property_p == NULL)
           {
-            prop_value_p = ecma_create_named_data_property (object_p,
-                                                            prop_name_p,
-                                                            ECMA_PROPERTY_CONFIGURABLE_ENUMERABLE_WRITABLE,
-                                                            NULL);
-          }
-          else
-          {
-            prop_value_p = ECMA_PROPERTY_VALUE_PTR (property_p);
+            property_p = ecma_create_named_data_property (object_p,
+                                                          prop_name_p,
+                                                          ECMA_PROPERTY_CONFIGURABLE_ENUMERABLE_WRITABLE);
           }
 
-          ecma_named_data_property_assign_value (object_p, prop_value_p, left_value);
+          ecma_named_data_property_assign_value (object_p, property_p, left_value);
 
           ecma_deref_ecma_string (prop_name_p);
 

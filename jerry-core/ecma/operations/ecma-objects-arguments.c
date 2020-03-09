@@ -111,7 +111,7 @@ ecma_op_create_arguments_object (ecma_object_t *func_obj_p, /**< callee function
     ext_object_p->u.class_prop.class_id = LIT_MAGIC_STRING_ARGUMENTS_UL;
   }
 
-  ecma_property_value_t *prop_value_p;
+  ecma_property_t *property_p;
 
   /* 11.a, 11.b */
   for (ecma_length_t index = 0;
@@ -120,23 +120,21 @@ ecma_op_create_arguments_object (ecma_object_t *func_obj_p, /**< callee function
   {
     ecma_string_t *index_string_p = ecma_new_ecma_string_from_uint32 (index);
 
-    prop_value_p = ecma_create_named_data_property (obj_p,
-                                                    index_string_p,
-                                                    ECMA_PROPERTY_CONFIGURABLE_ENUMERABLE_WRITABLE,
-                                                    NULL);
+    property_p = ecma_create_named_data_property (obj_p,
+                                                  index_string_p,
+                                                  ECMA_PROPERTY_CONFIGURABLE_ENUMERABLE_WRITABLE);
 
-    prop_value_p->value = ecma_copy_value_if_not_object (arguments_list_p[index]);
+    property_p->u.value = ecma_copy_value_if_not_object (arguments_list_p[index]);
 
     ecma_deref_ecma_string (index_string_p);
   }
 
   /* 7. */
-  prop_value_p = ecma_create_named_data_property (obj_p,
-                                                  ecma_get_magic_string (LIT_MAGIC_STRING_LENGTH),
-                                                  ECMA_PROPERTY_CONFIGURABLE_WRITABLE,
-                                                  NULL);
+  property_p = ecma_create_named_data_property (obj_p,
+                                                ecma_get_magic_string (LIT_MAGIC_STRING_LENGTH),
+                                                ECMA_PROPERTY_CONFIGURABLE_WRITABLE);
 
-  prop_value_p->value = ecma_make_uint32_value (arguments_number);
+  property_p->u.value = ecma_make_uint32_value (arguments_number);
 
   ecma_property_descriptor_t prop_desc = ecma_make_empty_property_descriptor ();
 
@@ -144,27 +142,26 @@ ecma_op_create_arguments_object (ecma_object_t *func_obj_p, /**< callee function
   /* ECMAScript v6, 9.4.4.6.7, 9.4.4.7.22 */
   ecma_string_t *symbol_p = ecma_op_get_global_symbol (LIT_GLOBAL_SYMBOL_ITERATOR);
 
-  prop_value_p = ecma_create_named_data_property (obj_p,
-                                                  symbol_p,
-                                                  ECMA_PROPERTY_CONFIGURABLE_WRITABLE,
-                                                  NULL);
+  property_p = ecma_create_named_data_property (obj_p,
+                                                symbol_p,
+                                                ECMA_PROPERTY_CONFIGURABLE_WRITABLE);
+
   ecma_deref_ecma_string (symbol_p);
-  prop_value_p->value = ecma_op_object_get_by_magic_id (ecma_builtin_get (ECMA_BUILTIN_ID_INTRINSIC_OBJECT),
+  property_p->u.value = ecma_op_object_get_by_magic_id (ecma_builtin_get (ECMA_BUILTIN_ID_INTRINSIC_OBJECT),
                                                         LIT_INTERNAL_MAGIC_STRING_ARRAY_PROTOTYPE_VALUES);
 
-  JERRY_ASSERT (ecma_is_value_object (prop_value_p->value));
-  ecma_deref_object (ecma_get_object_from_value (prop_value_p->value));
+  JERRY_ASSERT (ecma_is_value_object (property_p->u.value));
+  ecma_deref_object (ecma_get_object_from_value (property_p->u.value));
 #endif /* ENABLED (JERRY_ES2015) */
 
   /* 13. */
   if (!is_strict)
   {
-    prop_value_p = ecma_create_named_data_property (obj_p,
-                                                    ecma_get_magic_string (LIT_MAGIC_STRING_CALLEE),
-                                                    ECMA_PROPERTY_CONFIGURABLE_WRITABLE,
-                                                    NULL);
+    property_p = ecma_create_named_data_property (obj_p,
+                                                  ecma_get_magic_string (LIT_MAGIC_STRING_CALLEE),
+                                                  ECMA_PROPERTY_CONFIGURABLE_WRITABLE);
 
-    prop_value_p->value = ecma_make_object_value (func_obj_p);
+    property_p->u.value = ecma_make_object_value (func_obj_p);
   }
   else
   {

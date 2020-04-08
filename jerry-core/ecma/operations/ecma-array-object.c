@@ -148,14 +148,14 @@ ecma_op_new_fast_array_object (ecma_length_t length) /**< length of the new fast
   ext_obj_p->u.array.u.length_prop = (uint8_t) (ext_obj_p->u.array.u.length_prop | ECMA_FAST_ARRAY_FLAG);
   ext_obj_p->u.array.u.hole_count += length * ECMA_FAST_ARRAY_HOLE_ONE;
 
-  JERRY_ASSERT (object_p->u1.property_list_cp == JMEM_CP_NULL);
+  JERRY_ASSERT (object_p->u1.property_header_cp == JMEM_CP_NULL);
 
   for (uint32_t i = 0; i < aligned_length; i++)
   {
     values_p[i] = ECMA_VALUE_ARRAY_HOLE;
   }
 
-  ECMA_SET_POINTER (object_p->u1.property_list_cp, values_p);
+  ECMA_SET_POINTER (object_p->u1.property_header_cp, values_p);
   return object_p;
 } /* ecma_op_new_fast_array_object */
 
@@ -169,7 +169,7 @@ ecma_fast_array_convert_to_normal (ecma_object_t *object_p) /**< fast access mod
 
   ecma_extended_object_t *ext_obj_p = (ecma_extended_object_t *) object_p;
 
-  if (object_p->u1.property_list_cp == JMEM_CP_NULL)
+  if (object_p->u1.property_header_cp == JMEM_CP_NULL)
   {
     ext_obj_p->u.array.u.length_prop = (uint8_t) (ext_obj_p->u.array.u.length_prop & ~ECMA_FAST_ARRAY_FLAG);
     return;
@@ -180,61 +180,71 @@ ecma_fast_array_convert_to_normal (ecma_object_t *object_p) /**< fast access mod
   const uint32_t hole_count = ecma_fast_array_get_hole_count (object_p);
   const uint32_t prop_count = length - hole_count;
 
-  ecma_value_t *values_p = ECMA_GET_NON_NULL_POINTER (ecma_value_t, object_p->u1.property_list_cp);
-  ecma_property_t *property_list_p = NULL;
+  ecma_value_t *values_p = ECMA_GET_NON_NULL_POINTER (ecma_value_t, object_p->u1.property_header_cp);
+  ecma_property_header_t *property_header_p = NULL;
 
-  if (hole_count == 0)
+  if (prop_count > 0)
   {
-    size_t old_alloc_size = aligned_length * sizeof (ecma_value_t);
-    size_t new_alloc_size = (prop_count + 1 /* property counter */) * sizeof (ecma_property_t);
-
-    property_list_p = jmem_heap_realloc_block (values_p, old_alloc_size, new_alloc_size);
-
-    for (uint32_t property_index = prop_count; property_index > 0; property_index--)
+    if (hole_count == 0)
     {
-      uint32_t value_index = property_index - 1;
+      size_t old_alloc_size = aligned_length * sizeof (ecma_value_t);
+      size_t new_alloc_size = sizeof (ecma_property_header_t) + (prop_count * sizeof (ecma_property_t));
 
-      property_list_p[property_index].name_cp = (jmem_cpointer_t) value_index;
-      property_list_p[property_index].u.value = ((ecma_value_t *) property_list_p)[value_index];
-      property_list_p[property_index].type_flags = (uint8_t) (ECMA_PROPERTY_TYPE_NAMEDDATA
-                                                    | ECMA_PROPERTY_CONFIGURABLE_ENUMERABLE_WRITABLE
-                                                    | ECMA_FAST_ARRAY_UINT32_DIRECT_STRING_PROP_TYPE);
+      property_header_p = (ecma_property_header_t *) jmem_heap_realloc_block (values_p, old_alloc_size, new_alloc_size);
+      ecma_property_t *property_start_p = ECMA_PROPERTY_LIST_START (property_header_p);
+
+      for (uint32_t property_index = prop_count; property_index > 0; property_index--)
+      {
+        uint32_t value_index = property_index - 1;
+
+        property_start_p[value_index].name_cp = (jmem_cpointer_t) value_index;
+        property_start_p[value_index].u.value = ((ecma_value_t *) property_header_p)[value_index];
+        property_start_p[value_index].type_flags = (uint8_t) (ECMA_PROPERTY_TYPE_NAMEDDATA
+                                                              | ECMA_PROPERTY_CONFIGURABLE_ENUMERABLE_WRITABLE
+                                                              | ECMA_FAST_ARRAY_UINT32_DIRECT_STRING_PROP_TYPE);
+      }
+
+  #if ENABLED (JERRY_MEM_STATS)
+      jmem_stats_allocate_property_bytes (new_alloc_size);
+  #endif /* ENABLED (JERRY_MEM_STATS) */
+
+      for (uint32_t i = 0; i < ECMA_PROPERTY_CACHE_SIZE; i++)
+      {
+        property_header_p->cache[i] = 1;
+      }
+
+      property_header_p->count = (ecma_property_index_t) prop_count;
     }
+    else
+    {
+      property_header_p = ecma_alloc_property_list (prop_count);
+      ecma_property_t *property_start_p = ECMA_PROPERTY_LIST_START (property_header_p);
 
-#if ENABLED (JERRY_MEM_STATS)
-    jmem_stats_allocate_property_bytes (new_alloc_size);
-#endif /* ENABLED (JERRY_MEM_STATS) */
+      for (uint32_t index = 0, property_index = 0; index < length; index++)
+      {
+        if (ecma_is_value_array_hole (values_p[index]))
+        {
+          continue;
+        }
 
-    /* Initialize the property counter field. */
-    property_list_p[0].type_flags = ECMA_PROPERTY_TYPE_COUNTER;
-    property_list_p[0].u.value = (ecma_value_t) prop_count;
+        JERRY_ASSERT (property_index <= ECMA_DIRECT_STRING_MAX_IMM);
+
+        property_start_p[property_index].name_cp = (jmem_cpointer_t) index;
+        property_start_p[property_index].u.value = values_p[index];
+        property_start_p[property_index++].type_flags = (uint8_t) (ECMA_PROPERTY_TYPE_NAMEDDATA
+                                                                   | ECMA_PROPERTY_CONFIGURABLE_ENUMERABLE_WRITABLE
+                                                                   | ECMA_FAST_ARRAY_UINT32_DIRECT_STRING_PROP_TYPE);
+      }
+
+      jmem_heap_free_block (values_p, aligned_length * sizeof (ecma_value_t));
+    }
   }
   else
   {
-    property_list_p = ecma_alloc_property_list (prop_count);
-    ecma_property_t *property_start_p = ECMA_PROPERTY_LIST_START (property_list_p);
-
-    for (uint32_t index = 0, property_index = 0; index < length; index++)
-    {
-      if (ecma_is_value_array_hole (values_p[index]))
-      {
-        continue;
-      }
-
-      JERRY_ASSERT (property_index <= ECMA_DIRECT_STRING_MAX_IMM);
-
-      property_start_p[property_index].name_cp = (jmem_cpointer_t) index;
-      property_start_p[property_index].type_flags = (uint8_t) (ECMA_PROPERTY_TYPE_NAMEDDATA
-                                                     | ECMA_PROPERTY_CONFIGURABLE_ENUMERABLE_WRITABLE
-                                                     | ECMA_FAST_ARRAY_UINT32_DIRECT_STRING_PROP_TYPE);
-
-      property_start_p[property_index++].u.value = values_p[index];
-    }
-
     jmem_heap_free_block (values_p, aligned_length * sizeof (ecma_value_t));
   }
 
-  JMEM_CP_SET_NON_NULL_POINTER (object_p->u1.property_list_cp, property_list_p);
+  JMEM_CP_SET_POINTER (object_p->u1.property_header_cp, property_header_p);
   ext_obj_p->u.array.u.length_prop = (uint8_t) (ext_obj_p->u.array.u.length_prop & ~ECMA_FAST_ARRAY_FLAG);
 
 #if ENABLED (JERRY_PROPRETY_HASHMAP)
@@ -266,9 +276,9 @@ ecma_fast_array_set_property (ecma_object_t *object_p, /**< fast access mode arr
 
   if (JERRY_LIKELY (index < old_length))
   {
-    JERRY_ASSERT (object_p->u1.property_list_cp != JMEM_CP_NULL);
+    JERRY_ASSERT (object_p->u1.property_header_cp != JMEM_CP_NULL);
 
-    values_p = ECMA_GET_NON_NULL_POINTER (ecma_value_t, object_p->u1.property_list_cp);
+    values_p = ECMA_GET_NON_NULL_POINTER (ecma_value_t, object_p->u1.property_header_cp);
 
     if (ecma_is_value_array_hole (values_p[index]))
     {
@@ -303,9 +313,9 @@ ecma_fast_array_set_property (ecma_object_t *object_p, /**< fast access mode arr
 
   if (JERRY_LIKELY (index < aligned_length))
   {
-    JERRY_ASSERT (object_p->u1.property_list_cp != JMEM_CP_NULL);
+    JERRY_ASSERT (object_p->u1.property_header_cp != JMEM_CP_NULL);
 
-    values_p = ECMA_GET_NON_NULL_POINTER (ecma_value_t, object_p->u1.property_list_cp);
+    values_p = ECMA_GET_NON_NULL_POINTER (ecma_value_t, object_p->u1.property_header_cp);
     /* This area is filled with ECMA_VALUE_ARRAY_HOLE, but not counted in u.array.u.hole_count */
     JERRY_ASSERT (ecma_is_value_array_hole (values_p[index]));
     ext_obj_p->u.array.u.hole_count += new_holes * ECMA_FAST_ARRAY_HOLE_ONE;
@@ -356,13 +366,13 @@ ecma_fast_array_extend (ecma_object_t *object_p, /**< fast access mode array obj
   const uint32_t old_length_aligned = ECMA_FAST_ARRAY_ALIGN_LENGTH (old_length);
   const uint32_t new_length_aligned = ECMA_FAST_ARRAY_ALIGN_LENGTH (new_length);
 
-  if (object_p->u1.property_list_cp == JMEM_CP_NULL)
+  if (object_p->u1.property_header_cp == JMEM_CP_NULL)
   {
     new_values_p = jmem_heap_alloc_block (new_length_aligned * sizeof (ecma_value_t));
   }
   else
   {
-    ecma_value_t *values_p = ECMA_GET_NON_NULL_POINTER (ecma_value_t, object_p->u1.property_list_cp);
+    ecma_value_t *values_p = ECMA_GET_NON_NULL_POINTER (ecma_value_t, object_p->u1.property_header_cp);
     new_values_p = (ecma_value_t *) jmem_heap_realloc_block (values_p,
                                                              old_length_aligned * sizeof (ecma_value_t),
                                                              new_length_aligned * sizeof (ecma_value_t));
@@ -376,7 +386,7 @@ ecma_fast_array_extend (ecma_object_t *object_p, /**< fast access mode array obj
   ext_obj_p->u.array.u.hole_count += (new_length - old_length) * ECMA_FAST_ARRAY_HOLE_ONE;
   ext_obj_p->u.array.length = new_length;
 
-  ECMA_SET_NON_NULL_POINTER (object_p->u1.property_list_cp, new_values_p);
+  ECMA_SET_NON_NULL_POINTER (object_p->u1.property_header_cp, new_values_p);
 
   ecma_deref_object (object_p);
   return new_values_p;
@@ -401,14 +411,14 @@ ecma_array_object_delete_property (ecma_object_t *object_p, /**< object */
     return;
   }
 
-  JERRY_ASSERT (object_p->u1.property_list_cp != JMEM_CP_NULL);
+  JERRY_ASSERT (object_p->u1.property_header_cp != JMEM_CP_NULL);
 
   uint32_t index = ecma_string_get_array_index (property_name_p);
 
   JERRY_ASSERT (index != ECMA_STRING_NOT_ARRAY_INDEX);
   JERRY_ASSERT (index < ext_obj_p->u.array.length);
 
-  ecma_value_t *values_p = ECMA_GET_NON_NULL_POINTER (ecma_value_t, object_p->u1.property_list_cp);
+  ecma_value_t *values_p = ECMA_GET_NON_NULL_POINTER (ecma_value_t, object_p->u1.property_header_cp);
 
   if (ecma_is_value_array_hole (values_p[index]))
   {
@@ -435,7 +445,7 @@ ecma_delete_fast_array_properties (ecma_object_t *object_p, /**< fast access mod
   ecma_extended_object_t *ext_obj_p = (ecma_extended_object_t *) object_p;
 
   ecma_ref_object (object_p);
-  ecma_value_t *values_p = ECMA_GET_NON_NULL_POINTER (ecma_value_t, object_p->u1.property_list_cp);
+  ecma_value_t *values_p = ECMA_GET_NON_NULL_POINTER (ecma_value_t, object_p->u1.property_header_cp);
 
   uint32_t old_length = ext_obj_p->u.array.length;
   const uint32_t old_aligned_length = ECMA_FAST_ARRAY_ALIGN_LENGTH (old_length);
@@ -453,12 +463,12 @@ ecma_delete_fast_array_properties (ecma_object_t *object_p, /**< fast access mod
     }
   }
 
-  jmem_cpointer_t new_property_list_cp;
+  jmem_cpointer_t new_property_header_cp;
 
   if (new_length == 0)
   {
     jmem_heap_free_block (values_p, old_aligned_length * sizeof (ecma_value_t));
-    new_property_list_cp = JMEM_CP_NULL;
+    new_property_header_cp = JMEM_CP_NULL;
   }
   else
   {
@@ -474,11 +484,11 @@ ecma_delete_fast_array_properties (ecma_object_t *object_p, /**< fast access mod
       new_values_p[i] = ECMA_VALUE_ARRAY_HOLE;
     }
 
-    ECMA_SET_NON_NULL_POINTER (new_property_list_cp, new_values_p);
+    ECMA_SET_NON_NULL_POINTER (new_property_header_cp, new_values_p);
   }
 
   ext_obj_p->u.array.length = new_length;
-  object_p->u1.property_list_cp = new_property_list_cp;
+  object_p->u1.property_header_cp = new_property_header_cp;
 
   ecma_deref_object (object_p);
 
@@ -561,7 +571,7 @@ ecma_fast_array_get_property_names (ecma_object_t *object_p, /**< fast access mo
     return ret_p;
   }
 
-  ecma_value_t *values_p = ECMA_GET_NON_NULL_POINTER (ecma_value_t, object_p->u1.property_list_cp);
+  ecma_value_t *values_p = ECMA_GET_NON_NULL_POINTER (ecma_value_t, object_p->u1.property_header_cp);
 
   for (uint32_t i = 0; i < length; i++)
   {
@@ -671,7 +681,7 @@ ecma_op_create_array_object (const ecma_value_t *arguments_list_p, /**< list of 
     return ecma_make_object_value (object_p);
   }
 
-  ecma_value_t *values_p = ECMA_GET_NON_NULL_POINTER (ecma_value_t, object_p->u1.property_list_cp);
+  ecma_value_t *values_p = ECMA_GET_NON_NULL_POINTER (ecma_value_t, object_p->u1.property_header_cp);
   ecma_extended_object_t *ext_obj_p = (ecma_extended_object_t *) object_p;
 
   for (uint32_t index = 0;
@@ -821,29 +831,29 @@ ecma_delete_array_properties (ecma_object_t *object_p, /**< object */
   }
 
   /* First the minimum value of new_length is updated. */
-  jmem_cpointer_t current_prop_cp = object_p->u1.property_list_cp;
+  jmem_cpointer_t current_prop_cp = object_p->u1.property_header_cp;
 
   if (current_prop_cp == JMEM_CP_NULL)
   {
     return new_length;
   }
 
-  ecma_property_t *property_list_p = ECMA_GET_NON_NULL_POINTER (ecma_property_t, current_prop_cp);
+  ecma_property_header_t *property_header_p = ECMA_GET_NON_NULL_POINTER (ecma_property_header_t, current_prop_cp);
 
 #if ENABLED (JERRY_PROPRETY_HASHMAP)
   bool has_hashmap = false;
 
-  if (property_list_p->type_flags == ECMA_PROPERTY_TYPE_HASHMAP)
+  if (property_header_p->count == 0)
   {
-    ecma_property_hashmap_t *hashmap_p = (ecma_property_hashmap_t *) property_list_p;
-    property_list_p = ECMA_GET_NON_NULL_POINTER (ecma_property_t, hashmap_p->property_list_cp);
+    ecma_property_hashmap_t *hashmap_p = (ecma_property_hashmap_t *) property_header_p;
+    property_header_p = ECMA_GET_NON_NULL_POINTER (ecma_property_header_t, hashmap_p->property_header_cp);
 
     has_hashmap = true;
   }
 #endif /* ENABLED (JERRY_PROPRETY_HASHMAP) */
 
-  ecma_property_t *property_start_p = ECMA_PROPERTY_LIST_START (property_list_p);
-  ecma_property_index_t property_count = ECMA_PROPERTY_LIST_PROPERTY_COUNT (property_list_p);
+  ecma_property_t *property_start_p = ECMA_PROPERTY_LIST_START (property_header_p);
+  ecma_property_index_t property_count = ECMA_PROPERTY_LIST_PROPERTY_COUNT (property_header_p);
 
   for (ecma_property_index_t i = 0; i < property_count; i++)
   {

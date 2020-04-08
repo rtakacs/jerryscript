@@ -33,9 +33,8 @@
  */
 typedef struct
 {
-  uint8_t type_flags; /**< hashmap marker */
-  uint8_t padding; /**< unused area */
-  jmem_cpointer_t property_list_cp; /**< property list */
+  ecma_property_index_t count; /** hashmap marker */
+  jmem_cpointer_t property_header_cp; /**< property list */
   uint32_t max_property_count; /**< maximum property count (power of 2) */
   uint32_t null_count; /**< number of NULLs in the map */
   uint32_t unused_count; /**< number of unused entires in the map */

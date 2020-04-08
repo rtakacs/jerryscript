@@ -153,7 +153,7 @@ ecma_op_object_get_own_property (ecma_object_t *object_p, /**< the object */
         {
           if (JERRY_LIKELY (index < ext_object_p->u.array.length))
           {
-            ecma_value_t *values_p = ECMA_GET_NON_NULL_POINTER (ecma_value_t, object_p->u1.property_list_cp);
+            ecma_value_t *values_p = ECMA_GET_NON_NULL_POINTER (ecma_value_t, object_p->u1.property_header_cp);
 
             if (ecma_is_value_array_hole (values_p[index]))
             {
@@ -495,7 +495,7 @@ ecma_op_object_find_own (ecma_value_t base_value, /**< base value */
         {
           if (JERRY_LIKELY (index < ext_object_p->u.array.length))
           {
-            ecma_value_t *values_p = ECMA_GET_NON_NULL_POINTER (ecma_value_t, object_p->u1.property_list_cp);
+            ecma_value_t *values_p = ECMA_GET_NON_NULL_POINTER (ecma_value_t, object_p->u1.property_header_cp);
 
             return (ecma_is_value_array_hole (values_p[index]) ? ECMA_VALUE_NOT_FOUND
                                                                : ecma_fast_copy_value (values_p[index]));
@@ -1188,13 +1188,13 @@ ecma_op_object_put_apply_receiver (ecma_value_t receiver, /**< receiver */
     return result;
   }
   /* 5.f.i */
-  ecma_property_value_t *new_prop_value_p;
-  new_prop_value_p = ecma_create_named_data_property (receiver_obj_p,
+  ecma_property_t *new_prop_p;
+  new_prop_p = ecma_create_named_data_property (receiver_obj_p,
                                                       property_name_p,
-                                                      ECMA_PROPERTY_CONFIGURABLE_ENUMERABLE_WRITABLE,
-                                                      NULL);
-  JERRY_ASSERT (ecma_is_value_undefined (new_prop_value_p->value));
-  new_prop_value_p->value = ecma_copy_value_if_not_object (value);
+                                                      ECMA_PROPERTY_CONFIGURABLE_ENUMERABLE_WRITABLE);
+
+  JERRY_ASSERT (ecma_is_value_undefined (new_prop_p->u.value));
+  new_prop_p->u.value = ecma_copy_value_if_not_object (value);
 
   return ECMA_VALUE_TRUE;
 } /* ecma_op_object_put_apply_receiver */
@@ -2180,7 +2180,7 @@ ecma_op_object_get_property_names (ecma_object_t *obj_p, /**< object */
       }
     }
 
-    jmem_cpointer_t prop_iter_cp = prototype_chain_iter_p->u1.property_list_cp;
+    jmem_cpointer_t prop_iter_cp = prototype_chain_iter_p->u1.property_header_cp;
 
     if (ecma_op_object_is_fast_array (prototype_chain_iter_p) && prop_iter_cp != JMEM_CP_NULL)
     {
@@ -2232,18 +2232,18 @@ ecma_op_object_get_property_names (ecma_object_t *obj_p, /**< object */
     }
     else if (prop_iter_cp != JMEM_CP_NULL)
     {
-      ecma_property_t *property_list_p = ECMA_GET_NON_NULL_POINTER (ecma_property_t, prop_iter_cp);
+      ecma_property_header_t *property_header_p = ECMA_GET_NON_NULL_POINTER (ecma_property_header_t, prop_iter_cp);
 
 #if ENABLED (JERRY_PROPRETY_HASHMAP)
-      if (property_list_p->type_flags == ECMA_PROPERTY_TYPE_HASHMAP)
+      if (property_header_p->count == 0)
       {
-        ecma_property_hashmap_t *hashmap_p = (ecma_property_hashmap_t *) property_list_p;
-        property_list_p = ECMA_GET_NON_NULL_POINTER (ecma_property_t, hashmap_p->property_list_cp);
+        ecma_property_hashmap_t *hashmap_p = (ecma_property_hashmap_t *) property_header_p;
+        property_header_p = ECMA_GET_NON_NULL_POINTER (ecma_property_header_t, hashmap_p->property_header_cp);
       }
 #endif /* ENABLED (JERRY_PROPRETY_HASHMAP) */
 
-      ecma_property_t *property_start_p = ECMA_PROPERTY_LIST_START (property_list_p);
-      ecma_property_index_t property_count = ECMA_PROPERTY_LIST_PROPERTY_COUNT (property_list_p);
+      ecma_property_t *property_start_p = ECMA_PROPERTY_LIST_START (property_header_p);
+      ecma_property_index_t property_count = ECMA_PROPERTY_LIST_PROPERTY_COUNT (property_header_p);
 
       for (ecma_property_index_t i = 0; i < property_count; i++)
       {

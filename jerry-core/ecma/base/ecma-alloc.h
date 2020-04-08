@@ -102,19 +102,19 @@ void ecma_dealloc_string_buffer (ecma_string_t *string_p, size_t size);
  *
  * @return pointer to the property list.
  */
-ecma_property_t *ecma_alloc_property_list (uint32_t count);
+ecma_property_header_t *ecma_alloc_property_list (uint32_t count);
 
 /**
  * Reallocate and growth the property list.
  *
  * @return pointer to the new property list.
  */
-ecma_property_t *ecma_realloc_property_list (ecma_property_t *current_list_p);
+ecma_property_header_t *ecma_realloc_property_list (ecma_property_header_t *current_header_p);
 
 /**
  * Deallocate property list.
  */
-void ecma_dealloc_property_list (ecma_property_t *property_list_p);
+void ecma_dealloc_property_list (ecma_property_header_t *property_header_p);
 
 /**
  * @}

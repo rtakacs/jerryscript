@@ -214,21 +214,23 @@ ecma_dealloc_string_buffer (ecma_string_t *string_p, /**< string with data */
  *
  * @return pointer to the property list.
  */
-ecma_property_t *
+ecma_property_header_t *
 ecma_alloc_property_list (uint32_t count) /**< amount of properties */
 {
-  size_t alloc_size = (count + 1u /* property count field */) * sizeof (ecma_property_t);
+  size_t alloc_size = sizeof (ecma_property_header_t) + (count * sizeof (ecma_property_t));
 
 #if ENABLED (JERRY_MEM_STATS)
   jmem_stats_allocate_property_bytes (alloc_size);
 #endif /* ENABLED (JERRY_MEM_STATS) */
-  ecma_property_t *property_list_p = jmem_heap_alloc_block (alloc_size);
+  ecma_property_header_t *property_header_p = (ecma_property_header_t *) jmem_heap_alloc_block (alloc_size);
+  property_header_p->count = (ecma_property_index_t) count;
 
-  /* Initialize the property counter field. */
-  property_list_p[0].type_flags = ECMA_PROPERTY_TYPE_COUNTER;
-  property_list_p[0].u.value = (ecma_value_t) count;
+  for (uint32_t i = 0; i < ECMA_PROPERTY_CACHE_SIZE; i++)
+  {
+    property_header_p->cache[i] = 1;
+  }
 
-  return property_list_p;
+  return property_header_p;
 } /* ecma_alloc_property_list */
 
 /**
@@ -236,42 +238,42 @@ ecma_alloc_property_list (uint32_t count) /**< amount of properties */
  *
  * @return pointer to the new property list.
  */
-ecma_property_t *
-ecma_realloc_property_list (ecma_property_t *current_list_p) /**< property list pointer */
+ecma_property_header_t *
+ecma_realloc_property_list (ecma_property_header_t *current_header_p) /**< property list pointer */
 {
-  size_t old_prop_count = ECMA_PROPERTY_LIST_PROPERTY_COUNT (current_list_p);
+  size_t old_prop_count = ECMA_PROPERTY_LIST_PROPERTY_COUNT (current_header_p);
   size_t new_prop_count = old_prop_count + 1u;
 
-  size_t old_alloc_size = (old_prop_count + 1u /* property count field */) * sizeof (ecma_property_t);
-  size_t new_alloc_size = (new_prop_count + 1u /* property count field */) * sizeof (ecma_property_t);
+  size_t old_alloc_size = sizeof (ecma_property_header_t) + (old_prop_count * sizeof (ecma_property_t));
+  size_t new_alloc_size = sizeof (ecma_property_header_t) + (new_prop_count * sizeof (ecma_property_t));
 
 #if ENABLED (JERRY_MEM_STATS)
   jmem_stats_free_property_bytes (old_alloc_size);
   jmem_stats_allocate_property_bytes (new_alloc_size);
 #endif /* ENABLED (JERRY_MEM_STATS) */
 
-  ecma_property_t *new_list_p = jmem_heap_realloc_block (current_list_p, old_alloc_size, new_alloc_size);
+  ecma_property_header_t *new_header_p = jmem_heap_realloc_block (current_header_p, old_alloc_size, new_alloc_size);
 
   /* Update the counter field. */
-  new_list_p[0].u.value = (ecma_value_t) (new_prop_count);
+  new_header_p->count = (ecma_property_index_t) new_prop_count;
 
-  return new_list_p;
+  return new_header_p;
 } /* ecma_realloc_property_list */
 
 /**
  * Deallocate property list.
  */
 void
-ecma_dealloc_property_list (ecma_property_t *property_list_p) /**< property list pointer */
+ecma_dealloc_property_list (ecma_property_header_t *property_header_p) /**< property list pointer */
 {
-  size_t prop_count = ECMA_PROPERTY_LIST_PROPERTY_COUNT (property_list_p);
-  size_t alloc_size = (prop_count + 1u /* property count field */) * sizeof (ecma_property_t);
+  size_t prop_count = ECMA_PROPERTY_LIST_PROPERTY_COUNT (property_header_p);
+  size_t alloc_size = sizeof (ecma_property_header_t) + (prop_count * sizeof (ecma_property_t));
 
 #if ENABLED (JERRY_MEM_STATS)
   jmem_stats_free_property_bytes (alloc_size);
 #endif /* ENABLED (JERRY_MEM_STATS) */
 
-  jmem_heap_free_block (property_list_p, alloc_size);
+  jmem_heap_free_block (property_header_p, alloc_size);
 } /* ecma_dealloc_property_list */
 
 /**

@@ -555,7 +555,7 @@ ecma_builtin_array_prototype_object_reverse (ecma_value_t this_arg, /**< this ar
         && len != 0
         && ecma_op_ordinary_object_is_extensible (obj_p))
     {
-      ecma_value_t *buffer_p = ECMA_GET_NON_NULL_POINTER (ecma_value_t, obj_p->u1.property_list_cp);
+      ecma_value_t *buffer_p = ECMA_GET_NON_NULL_POINTER (ecma_value_t, obj_p->u1.property_header_cp);
 
       for (uint32_t i = 0; i < middle; i++)
       {
@@ -740,7 +740,7 @@ ecma_builtin_array_prototype_object_shift (ecma_object_t *obj_p, /**< array obje
         && len != 0
         && ecma_op_ordinary_object_is_extensible (obj_p))
     {
-      ecma_value_t *buffer_p = ECMA_GET_NON_NULL_POINTER (ecma_value_t, obj_p->u1.property_list_cp);
+      ecma_value_t *buffer_p = ECMA_GET_NON_NULL_POINTER (ecma_value_t, obj_p->u1.property_header_cp);
       ecma_value_t ret_value = buffer_p[0];
 
       if (ecma_is_value_object (ret_value))
@@ -891,7 +891,7 @@ ecma_builtin_array_prototype_object_slice (ecma_value_t arg1, /**< start */
 
     if (ext_from_obj_p->u.array.u.hole_count < ECMA_FAST_ARRAY_HOLE_ONE)
     {
-      if (JERRY_UNLIKELY (obj_p->u1.property_list_cp == JMEM_CP_NULL))
+      if (JERRY_UNLIKELY (obj_p->u1.property_header_cp == JMEM_CP_NULL))
       {
         /**
          * Very unlikely case: the buffer copied from is a fast buffer and the property list was deleted.
@@ -907,7 +907,7 @@ ecma_builtin_array_prototype_object_slice (ecma_value_t arg1, /**< start */
       ecma_value_t *to_buffer_p;
       if (copied_length == target_length)
       {
-        to_buffer_p = ECMA_GET_NON_NULL_POINTER (ecma_value_t, new_array_p->u1.property_list_cp);
+        to_buffer_p = ECMA_GET_NON_NULL_POINTER (ecma_value_t, new_array_p->u1.property_header_cp);
       }
       else if (copied_length > target_length)
       {
@@ -916,13 +916,13 @@ ecma_builtin_array_prototype_object_slice (ecma_value_t arg1, /**< start */
       else
       {
         ecma_delete_fast_array_properties (new_array_p, copied_length);
-        to_buffer_p = ECMA_GET_NON_NULL_POINTER (ecma_value_t, new_array_p->u1.property_list_cp);
+        to_buffer_p = ECMA_GET_NON_NULL_POINTER (ecma_value_t, new_array_p->u1.property_header_cp);
       }
 #else /* !ENABLED (JERRY_ES2015) */
       ecma_value_t *to_buffer_p = ecma_fast_array_extend (new_array_p, copied_length);
 #endif /* ENABLED (JERRY_ES2015) */
 
-      ecma_value_t *from_buffer_p = ECMA_GET_NON_NULL_POINTER (ecma_value_t, obj_p->u1.property_list_cp);
+      ecma_value_t *from_buffer_p = ECMA_GET_NON_NULL_POINTER (ecma_value_t, obj_p->u1.property_header_cp);
 
       for (uint32_t k = start; k < end; k++, n++)
       {
@@ -1679,7 +1679,7 @@ ecma_builtin_array_prototype_object_index_of (const ecma_value_t args[], /**< ar
     if (ext_obj_p->u.array.u.hole_count < ECMA_FAST_ARRAY_HOLE_ONE
         && len != 0)
     {
-      ecma_value_t *buffer_p = ECMA_GET_NON_NULL_POINTER (ecma_value_t, obj_p->u1.property_list_cp);
+      ecma_value_t *buffer_p = ECMA_GET_NON_NULL_POINTER (ecma_value_t, obj_p->u1.property_header_cp);
 
       while (from_idx < len)
       {
@@ -1779,7 +1779,7 @@ ecma_builtin_array_prototype_object_last_index_of (const ecma_value_t args[], /*
     if (ext_obj_p->u.array.u.hole_count < ECMA_FAST_ARRAY_HOLE_ONE
         && len != 0)
     {
-      ecma_value_t *buffer_p = ECMA_GET_NON_NULL_POINTER (ecma_value_t, obj_p->u1.property_list_cp);
+      ecma_value_t *buffer_p = ECMA_GET_NON_NULL_POINTER (ecma_value_t, obj_p->u1.property_header_cp);
 
       while (from_idx < len)
       {
@@ -2295,7 +2295,7 @@ ecma_builtin_array_prototype_fill (ecma_value_t value, /**< value */
         && len != 0
         && ecma_op_ordinary_object_is_extensible (obj_p))
     {
-      ecma_value_t *buffer_p = ECMA_GET_NON_NULL_POINTER (ecma_value_t, obj_p->u1.property_list_cp);
+      ecma_value_t *buffer_p = ECMA_GET_NON_NULL_POINTER (ecma_value_t, obj_p->u1.property_header_cp);
 
       while (k < final)
       {
@@ -2487,9 +2487,9 @@ ecma_builtin_array_prototype_object_copy_within (const ecma_value_t args[], /**<
 
     if (ext_obj_p->u.array.u.hole_count < ECMA_FAST_ARRAY_HOLE_ONE)
     {
-      if (obj_p->u1.property_list_cp != JMEM_CP_NULL)
+      if (obj_p->u1.property_header_cp != JMEM_CP_NULL)
       {
-        ecma_value_t *buffer_p = ECMA_GET_NON_NULL_POINTER (ecma_value_t, obj_p->u1.property_list_cp);
+        ecma_value_t *buffer_p = ECMA_GET_NON_NULL_POINTER (ecma_value_t, obj_p->u1.property_header_cp);
 
         for (; count > 0; count--)
         {

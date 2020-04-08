@@ -76,7 +76,7 @@ vm_op_get_value (ecma_value_t object, /**< base object */
           if (JERRY_LIKELY (ecma_op_array_is_fast_array (ext_object_p)
                             && (uint32_t) int_value < ext_object_p->u.array.length))
           {
-            ecma_value_t *values_p = ECMA_GET_NON_NULL_POINTER (ecma_value_t, object_p->u1.property_list_cp);
+            ecma_value_t *values_p = ECMA_GET_NON_NULL_POINTER (ecma_value_t, object_p->u1.property_header_cp);
 
             if (JERRY_LIKELY (!ecma_is_value_array_hole (values_p[int_value])))
             {

@@ -1033,25 +1033,25 @@ static void
 opfunc_set_class_attributes (ecma_object_t *obj_p, /**< object */
                              ecma_object_t *parent_env_p) /**< parent environment */
 {
-  jmem_cpointer_t prop_iter_cp = obj_p->u1.property_list_cp;
+  jmem_cpointer_t prop_iter_cp = obj_p->u1.property_header_cp;
 
   if (prop_iter_cp == JMEM_CP_NULL)
   {
     return;
   }
 
-  ecma_property_t *property_list_p = ECMA_GET_NON_NULL_POINTER (ecma_property_t, prop_iter_cp);
+  ecma_property_header_t *property_header_p = ECMA_GET_NON_NULL_POINTER (ecma_property_header_t, prop_iter_cp);
 
 #if ENABLED (JERRY_PROPRETY_HASHMAP)
-  if (property_list_p->type_flags == ECMA_PROPERTY_TYPE_HASHMAP)
+  if (property_header_p->count == 0)
   {
-    ecma_property_hashmap_t *hashmap_p = (ecma_property_hashmap_t *) property_list_p;
-    property_list_p = ECMA_GET_NON_NULL_POINTER (ecma_property_t, hashmap_p->property_list_cp);
+    ecma_property_hashmap_t *hashmap_p = (ecma_property_hashmap_t *) property_header_p;
+    property_header_p = ECMA_GET_NON_NULL_POINTER (ecma_property_header_t, hashmap_p->property_header_cp);
   }
 #endif /* ENABLED (JERRY_PROPRETY_HASHMAP) */
 
-  ecma_property_t *property_start_p = ECMA_PROPERTY_LIST_START (property_list_p);
-  ecma_property_index_t property_count = ECMA_PROPERTY_LIST_PROPERTY_COUNT (property_list_p);
+  ecma_property_t *property_start_p = ECMA_PROPERTY_LIST_START (property_header_p);
+  ecma_property_index_t property_count = ECMA_PROPERTY_LIST_PROPERTY_COUNT (property_header_p);
 
   for (ecma_property_index_t i = 0; i < property_count; i++)
   {
@@ -1084,13 +1084,6 @@ opfunc_set_class_attributes (ecma_object_t *obj_p, /**< object */
         {
           opfunc_set_home_object (ECMA_GET_NON_NULL_POINTER (ecma_object_t, get_set_pair_p->setter_cp), parent_env_p);
         }
-      }
-      else
-      {
-        JERRY_ASSERT (ECMA_PROPERTY_GET_TYPE (curr_property_p) == ECMA_PROPERTY_TYPE_SPECIAL);
-
-        JERRY_ASSERT (curr_property_p->type_flags == ECMA_PROPERTY_TYPE_HASHMAP
-                      || curr_property_p->type_flags == ECMA_PROPERTY_TYPE_DELETED);
       }
     }
   }

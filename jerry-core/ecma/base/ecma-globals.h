@@ -504,10 +504,10 @@ typedef union
  */
 typedef struct
 {
+  ecma_property_value_t u; /**< value of the property */
+  jmem_cpointer_t name_cp; /**< name of the property */
   uint8_t type_flags; /**< ecma_property_types_t (3 bit) and ecma_property_flags_t */
   uint8_t prop_count; /**< unused */
-  jmem_cpointer_t name_cp; /**< name of the property */
-  ecma_property_value_t u; /**< value of the property */
 } ecma_property_t;
 
 /**
@@ -518,6 +518,18 @@ typedef uint32_t ecma_property_index_t;
 #else /* !ENABLED (JERRY_CPOINTER_32_BIT) */
 typedef uint16_t ecma_property_index_t;
 #endif /* ENABLED (JERRY_CPOINTER_32_BIT) */
+
+#if ENABLED (JERRY_CPOINTER_32_BIT)
+#define ECMA_PROPERTY_CACHE_SIZE 2
+#else /* !ENABLED (JERRY_CPOINTER_32_BIT) */
+#define ECMA_PROPERTY_CACHE_SIZE 3
+#endif /* ENABLED (JERRY_CPOINTER_32_BIT) */
+
+typedef struct
+{
+  ecma_property_index_t count; /**< value of the property */
+  ecma_property_index_t cache[ECMA_PROPERTY_CACHE_SIZE]; /**< value of the property */
+} ecma_property_header_t;
 
 /**
  * Invalid property index.
@@ -531,14 +543,14 @@ typedef uint16_t ecma_property_index_t;
 /**
  * First property value of the property list.
  */
-#define ECMA_PROPERTY_LIST_START(property_list_p) \
-  ((ecma_property_t *)(property_list_p + 1u))
+#define ECMA_PROPERTY_LIST_START(property_header_p) \
+  ((ecma_property_t *) (property_header_p + 1u))
 
 /**
  * Number of property entries in the property list.
  */
-#define ECMA_PROPERTY_LIST_PROPERTY_COUNT(property_list_p) \
-  ((ecma_property_index_t) property_list_p[0].u.value)
+#define ECMA_PROPERTY_LIST_PROPERTY_COUNT(property_header_p) \
+  ((ecma_property_index_t) property_header_p->count)
 
 /**
  * Get property type.
@@ -750,7 +762,7 @@ typedef struct
   /** compressed pointer to property list or bound object */
   union
   {
-    jmem_cpointer_t property_list_cp; /**< compressed pointer to object's
+    jmem_cpointer_t property_header_cp; /**< compressed pointer to object's
                                        *   or declerative lexical environments's property list */
     jmem_cpointer_t bound_object_cp;  /**< compressed pointer to lexical environments's the bound object */
     jmem_cpointer_t home_object_cp;   /**< compressed pointer to lexical environments's the home object */
@@ -1690,10 +1702,8 @@ typedef uint32_t ecma_lcache_hash_entry_id_t;
  */
 typedef struct
 {
-  jmem_cpointer_t object_cp; /**< Object compressed pointer */
-  ecma_property_index_t index; /**< Identifier on the property list */
-
   ecma_lcache_hash_entry_id_t id; /**< Entry identifier in LCache */
+  ecma_property_index_t index; /**< Identifier on the property list */
 } ecma_lcache_hash_entry_t;
 
 /**

@@ -451,7 +451,7 @@ jerry_debugger_send_scope_variables (const uint8_t *recv_buffer_p) /**< pointer 
 
   if (ecma_get_lex_env_type (lex_env_p) == ECMA_LEXICAL_ENVIRONMENT_DECLARATIVE)
   {
-    prop_iter_cp = lex_env_p->u1.property_list_cp;
+    prop_iter_cp = lex_env_p->u1.property_header_cp;
   }
   else
   {
@@ -463,7 +463,7 @@ jerry_debugger_send_scope_variables (const uint8_t *recv_buffer_p) /**< pointer 
       ecma_fast_array_convert_to_normal (binding_obj_p);
     }
 
-    prop_iter_cp = binding_obj_p->u1.property_list_cp;
+    prop_iter_cp = binding_obj_p->u1.property_header_cp;
   }
 
   JERRY_DEBUGGER_SEND_BUFFER_AS (jerry_debugger_send_string_t, message_string_p);
@@ -473,9 +473,9 @@ jerry_debugger_send_scope_variables (const uint8_t *recv_buffer_p) /**< pointer 
 
   if (prop_iter_cp != JMEM_CP_NULL)
   {
-    ecma_property_t *property_list_p = ECMA_GET_NON_NULL_POINTER (ecma_property_t, prop_iter_cp);
-    ecma_property_t *property_start_p = ECMA_PROPERTY_LIST_START (property_list_p);
-    ecma_property_index_t property_count = ECMA_PROPERTY_LIST_PROPERTY_COUNT (property_list_p);
+    ecma_property_header_t *property_header_p = ECMA_GET_NON_NULL_POINTER (ecma_property_header_t, prop_iter_cp);
+    ecma_property_t *property_start_p = ECMA_PROPERTY_LIST_START (property_header_p);
+    ecma_property_index_t property_count = ECMA_PROPERTY_LIST_PROPERTY_COUNT (property_header_p);
 
     for (ecma_property_index_t i = 0; i < property_count; i++)
     {

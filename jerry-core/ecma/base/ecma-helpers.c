@@ -533,7 +533,8 @@ ecma_find_named_property (ecma_object_t *obj_p, /**< object to find property in 
     return NULL;
   }
 
-  ecma_property_header_t *property_header_p = ECMA_GET_NON_NULL_POINTER (ecma_property_header_t, obj_p->u1.property_header_cp);
+  ecma_property_header_t *property_header_p = ECMA_GET_NON_NULL_POINTER (ecma_property_header_t,
+                                                                         obj_p->u1.property_header_cp);
   ecma_property_t *property_list_p = (ecma_property_t *) property_header_p;
 
 #if ENABLED (JERRY_PROPRETY_HASHMAP)

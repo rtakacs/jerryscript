@@ -860,24 +860,21 @@ ecma_delete_array_properties (ecma_object_t *object_p, /**< object */
     ecma_property_t *curr_property_p = property_start_p + i;
     JERRY_ASSERT (ECMA_PROPERTY_IS_PROPERTY (curr_property_p));
 
-    if (curr_property_p->type_flags != ECMA_PROPERTY_TYPE_DELETED)
+    if (ECMA_PROPERTY_IS_NAMED_PROPERTY (curr_property_p)
+        && !ecma_is_property_configurable (curr_property_p))
     {
-      if (ECMA_PROPERTY_IS_NAMED_PROPERTY (curr_property_p)
-          && !ecma_is_property_configurable (curr_property_p))
+      uint32_t index = ecma_string_get_property_index (curr_property_p);
+
+      if (index < old_length && index >= new_length)
       {
-        uint32_t index = ecma_string_get_property_index (curr_property_p);
+        JERRY_ASSERT (index != ECMA_STRING_NOT_ARRAY_INDEX);
 
-        if (index < old_length && index >= new_length)
+        new_length = index + 1;
+
+        if (new_length == old_length)
         {
-          JERRY_ASSERT (index != ECMA_STRING_NOT_ARRAY_INDEX);
-
-          new_length = index + 1;
-
-          if (new_length == old_length)
-          {
-            /* Early return. */
-            return new_length;
-          }
+          /* Early return. */
+          return new_length;
         }
       }
     }
@@ -899,29 +896,26 @@ ecma_delete_array_properties (ecma_object_t *object_p, /**< object */
 
     JERRY_ASSERT (ECMA_PROPERTY_IS_PROPERTY (curr_property_p));
 
-    if (curr_property_p->type_flags != ECMA_PROPERTY_TYPE_DELETED)
+    if (ECMA_PROPERTY_IS_NAMED_PROPERTY (curr_property_p)
+        && ecma_is_property_configurable (curr_property_p))
     {
-      if (ECMA_PROPERTY_IS_NAMED_PROPERTY (curr_property_p)
-          && ecma_is_property_configurable (curr_property_p))
-      {
-        uint32_t index = ecma_string_get_property_index (curr_property_p);
+      uint32_t index = ecma_string_get_property_index (curr_property_p);
 
-        if (index < old_length && index >= new_length)
-        {
-          JERRY_ASSERT (index != ECMA_STRING_NOT_ARRAY_INDEX);
+      if (index < old_length && index >= new_length)
+      {
+        JERRY_ASSERT (index != ECMA_STRING_NOT_ARRAY_INDEX);
 
 #if ENABLED (JERRY_PROPRETY_HASHMAP)
-          if (hashmap_status == ECMA_PROPERTY_HASHMAP_DELETE_HAS_HASHMAP)
-          {
-            hashmap_status = ecma_property_hashmap_delete (object_p,
-                                                           curr_property_p);
-          }
+        if (hashmap_status == ECMA_PROPERTY_HASHMAP_DELETE_HAS_HASHMAP)
+        {
+          hashmap_status = ecma_property_hashmap_delete (object_p,
+                                                         curr_property_p);
+        }
 #endif /* ENABLED (JERRY_PROPRETY_HASHMAP) */
 
-          ecma_free_property (object_p, curr_property_p);
-          curr_property_p->type_flags = ECMA_PROPERTY_TYPE_DELETED;
-          curr_property_p->name_cp = LIT_INTERNAL_MAGIC_STRING_DELETED;
-        }
+        ecma_free_property (object_p, curr_property_p);
+        curr_property_p->type_flags = ECMA_PROPERTY_TYPE_DELETED;
+        curr_property_p->name_cp = LIT_INTERNAL_MAGIC_STRING_DELETED;
       }
     }
   }

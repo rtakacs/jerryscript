@@ -24,37 +24,37 @@
  */
 
 /**
- * Recommended minimum number of items in a property cache.
- */
-#define ECMA_PROPERTY_HASMAP_MINIMUM_SIZE 32
-
-/**
- * Property hash.
+ * Hashmap buckets.
  */
 typedef struct
 {
-  ecma_property_index_t count; /**< hashmap marker */
-  jmem_cpointer_t property_header_cp; /**< property list */
-  uint32_t max_property_count; /**< maximum property count (power of 2) */
-  uint32_t null_count; /**< number of NULLs in the map */
-  uint32_t unused_count; /**< number of unused entires in the map */
+  ecma_property_index_t bucket_count; /**< number of buckets */
+  ecma_property_index_t property_count; /**<unused */
+} ecma_hashmap_header_t;
 
-  /*
-   * The hash is followed by max_property_count ecma_cpointer_t
-   * compressed pointers and (max_property_count + 7) / 8 bytes
-   * which stores a flag for each compressed pointer.
-   *
-   * If the compressed pointer is equal to ECMA_NULL_POINTER
-   *   - flag is cleared if the entry is NULL
-   *   - flag is set if the entry is deleted
-   *
-   * If the compressed pointer is not equal to ECMA_NULL_POINTER
-   *   - flag is cleared if the first entry of a property pair is referenced
-   *   - flag is set if the second entry of a property pair is referenced
-   */
-} ecma_property_hashmap_t;
+/**
+ * Hashmap bucket entry.
+ */
+typedef struct
+{
+  ecma_property_index_t index; /**< property index */
+  jmem_cpointer_t next_cp; /**< next entry pointer */
+} ecma_hashmap_entry_t;
+
+/**
+ * Hashmap bucket header.
+ */
+typedef struct
+{
+  ecma_property_index_t count; /**< property counter */
+  jmem_cpointer_t next_cp; /**< next entry pointer */
+} ecma_hashmap_bucket_header_t;
+
 
 #if ENABLED (JERRY_PROPRETY_HASHMAP)
+
+/* Recommended minimum number of items in a property cache. */
+#define ECMA_PROPERTY_HASMAP_MINIMUM_SIZE 32
 
 /**
  * Simple ecma values
@@ -66,13 +66,14 @@ typedef enum
   ECMA_PROPERTY_HASHMAP_DELETE_RECREATE_HASHMAP, /**< hashmap should be recreated */
 } ecma_property_hashmap_delete_status;
 
-void ecma_property_hashmap_create (ecma_object_t *object_p);
-void ecma_property_hashmap_free (ecma_object_t *object_p);
-void ecma_property_hashmap_insert (ecma_object_t *object_p, ecma_string_t *name_p, ecma_property_index_t index);
-ecma_property_hashmap_delete_status ecma_property_hashmap_delete (ecma_object_t *object_p,
+void ecma_property_hashmap_create (ecma_property_header_t *property_header_p);
+void ecma_property_hashmap_free (ecma_property_header_t *property_header_p);
+void ecma_property_hashmap_insert (ecma_property_header_t *property_header_p,
+                                   ecma_string_t *name_p, ecma_property_index_t index);
+ecma_property_hashmap_delete_status ecma_property_hashmap_delete (ecma_property_header_t *property_header_p,
                                                                   ecma_property_t *property_p);
 
-ecma_property_t *ecma_property_hashmap_find (ecma_property_hashmap_t *hashmap_p, ecma_string_t *name_p,
+ecma_property_t *ecma_property_hashmap_find (ecma_property_header_t *property_header_p, ecma_string_t *name_p,
                                              jmem_cpointer_t *property_real_name_cp, ecma_property_index_t *index);
 #endif /* ENABLED (JERRY_PROPRETY_HASHMAP) */
 

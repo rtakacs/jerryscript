@@ -75,18 +75,17 @@ ecma_lcache_invalidate_entry (ecma_lcache_hash_entry_t *entry_p) /**< entry to i
                                                                          obj_p->u1.property_header_cp);
 
 #if ENABLED (JERRY_PROPRETY_HASHMAP)
-  if (property_header_p->count == 0)
+  if (property_header_p->cache[0] != 0)
   {
-    ecma_property_hashmap_t *hashmap_p = (ecma_property_hashmap_t *) property_header_p;
-    property_header_p = ECMA_GET_NON_NULL_POINTER (ecma_property_header_t, hashmap_p->property_header_cp);
+#endif /* ENABLED (JERRY_PROPRETY_HASHMAP) */
+#if !ENABLED (JERRY_CPOINTER_32_BIT)
+    property_header_p->cache[2] = property_header_p->cache[1];
+#endif /* !ENABLED (JERRY_CPOINTER_32_BIT) */
+    property_header_p->cache[1] = property_header_p->cache[0];
+    property_header_p->cache[0] = (ecma_property_index_t) entry_p->index;
+#if ENABLED (JERRY_PROPRETY_HASHMAP)
   }
 #endif /* ENABLED (JERRY_PROPRETY_HASHMAP) */
-
-#if !ENABLED (JERRY_CPOINTER_32_BIT)
-  property_header_p->cache[2] = property_header_p->cache[1];
-#endif /* !ENABLED (JERRY_CPOINTER_32_BIT) */
-  property_header_p->cache[1] = property_header_p->cache[0];
-  property_header_p->cache[0] = (ecma_property_index_t) entry_p->index;
 
   ecma_property_t *property_p = (ecma_property_t *) property_header_p + entry_p->index;
 
@@ -205,14 +204,6 @@ ecma_lcache_lookup (const ecma_object_t *object_p, /**< object */
     {
       ecma_property_header_t *property_header_p = ECMA_GET_NON_NULL_POINTER (ecma_property_header_t,
                                                                              object_p->u1.property_header_cp);
-
-#if ENABLED (JERRY_PROPRETY_HASHMAP)
-      if (property_header_p->count == 0)
-      {
-        ecma_property_hashmap_t *hashmap_p = (ecma_property_hashmap_t *) property_header_p;
-        property_header_p = ECMA_GET_NON_NULL_POINTER (ecma_property_header_t, hashmap_p->property_header_cp);
-      }
-#endif /* ENABLED (JERRY_PROPRETY_HASHMAP) */
 
       ecma_property_t *property_p = (ecma_property_t *) property_header_p + entry_p->index;
 

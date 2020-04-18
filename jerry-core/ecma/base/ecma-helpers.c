@@ -565,7 +565,7 @@ ecma_find_named_property (ecma_object_t *obj_p, /**< object to find property in 
   }
 
   property_p = property_list_p;
-  ecma_property_t *property_list_end_p =  property_list_p + prop_index;
+  ecma_property_t *property_list_end_p = property_list_p + prop_index;
 
   if (ECMA_IS_DIRECT_STRING (name_p))
   {

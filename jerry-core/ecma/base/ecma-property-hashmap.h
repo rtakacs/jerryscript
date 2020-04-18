@@ -24,6 +24,11 @@
  */
 
 /**
+ * Number of indexes within a hashmap entry.
+ */
+#define ECMA_PROPERTY_HASHMAP_INDEX_SIZE 3
+
+/**
  * Hashmap buckets.
  */
 typedef struct
@@ -37,8 +42,8 @@ typedef struct
  */
 typedef struct
 {
-  ecma_property_index_t index; /**< property index */
   jmem_cpointer_t next_cp; /**< next entry pointer */
+  ecma_property_index_t index[ECMA_PROPERTY_HASHMAP_INDEX_SIZE]; /**< property indexes */
 } ecma_hashmap_entry_t;
 
 /**
@@ -46,8 +51,8 @@ typedef struct
  */
 typedef struct
 {
-  ecma_property_index_t count; /**< property counter */
   jmem_cpointer_t next_cp; /**< next entry pointer */
+  ecma_property_index_t property_count; /* bucket entry counter */
 } ecma_hashmap_bucket_header_t;
 
 

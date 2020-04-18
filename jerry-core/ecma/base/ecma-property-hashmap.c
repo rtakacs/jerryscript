@@ -109,6 +109,7 @@ ecma_property_hashmap_create (ecma_property_header_t *property_header_p) /**< ob
   property_header_p->cache[0] = 0;
   ECMA_SET_NON_NULL_POINTER (property_header_p->cache[1], hashmap_p);
 
+#if 0
   ecma_property_t *property_start_p = ECMA_PROPERTY_LIST_START (property_header_p);
   ecma_property_index_t property_count = ECMA_PROPERTY_LIST_PROPERTY_COUNT (property_header_p);
 
@@ -127,6 +128,7 @@ ecma_property_hashmap_create (ecma_property_header_t *property_header_p) /**< ob
       ecma_property_hashmap_insert_into_bucket (bucket_p, (ecma_property_index_t) (index + 1u));
     }
   }
+#endif
 } /* ecma_property_hashmap_create */
 
 /**
@@ -277,7 +279,7 @@ ecma_property_hashmap_find (ecma_property_header_t *property_header_p, /**< hash
   ecma_hashmap_header_t *hashmap_p = ECMA_GET_NON_NULL_POINTER (ecma_hashmap_header_t,
                                                                 (jmem_cpointer_t) property_header_p->cache[1]);
 
-#ifndef JERRY_NDEBUG
+#if 0
   /* A sanity check in debug mode: a named property must be present
    * in both the property hashmap and in the property chain, or missing
    * from both data collection. The following code checks the property
@@ -336,7 +338,7 @@ ecma_property_hashmap_find (ecma_property_header_t *property_header_p, /**< hash
           if (curr_property_p->name_cp == property_name_cp
               && ECMA_PROPERTY_GET_NAME_TYPE (curr_property_p) == prop_name_type)
           {
-      #ifndef JERRY_NDEBUG
+      #if 0
             JERRY_ASSERT (property_found);
       #endif /* !JERRY_NDEBUG */
 
@@ -351,7 +353,7 @@ ecma_property_hashmap_find (ecma_property_header_t *property_header_p, /**< hash
       next_cp = entry_p->next_cp;
     }
 
-    #ifndef JERRY_NDEBUG
+    #if 0
       JERRY_ASSERT (!property_found);
     #endif /* !JERRY_NDEBUG */
 
@@ -378,7 +380,7 @@ ecma_property_hashmap_find (ecma_property_header_t *property_header_p, /**< hash
 
           if (ecma_compare_ecma_non_direct_strings (prop_name_p, name_p))
           {
-    #ifndef JERRY_NDEBUG
+    #if 0
             JERRY_ASSERT (property_found);
     #endif /* !JERRY_NDEBUG */
 
@@ -394,7 +396,7 @@ ecma_property_hashmap_find (ecma_property_header_t *property_header_p, /**< hash
     next_cp = entry_p->next_cp;
   }
 
-#ifndef JERRY_NDEBUG
+#if 0
   JERRY_ASSERT (!property_found);
 #endif /* !JERRY_NDEBUG */
 

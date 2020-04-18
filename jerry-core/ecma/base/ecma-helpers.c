@@ -518,15 +518,18 @@ ecma_find_named_property (ecma_object_t *obj_p, /**< object to find property in 
                                              &property_index);
 
 #if ENABLED (JERRY_LCACHE)
-    if (property_p != NULL
-        && !ecma_is_property_lcached (property_p))
+    if (property_p != NULL)
     {
-      ecma_lcache_insert (obj_p, property_real_name_cp, property_index, property_p);
+      if (!ecma_is_property_lcached (property_p))
+      {
+        ecma_lcache_insert (obj_p, property_real_name_cp, property_index, property_p);
+      }
+
+      return property_p;
     }
 #else /* !ENABLED (JERRY_LCACHE) */
     (void) property_index;
 #endif /* ENABLED (JERRY_LCACHE) */
-    return property_p;
   }
 #endif /* ENABLED (JERRY_PROPRETY_HASHMAP) */
 
@@ -614,6 +617,13 @@ ecma_find_named_property (ecma_object_t *obj_p, /**< object to find property in 
 
 insert:
   JERRY_ASSERT (prop_index != 0);
+
+#if ENABLED (JERRY_PROPRETY_HASHMAP)
+  if (property_header_p->cache[0] == 0)
+  {
+    ecma_property_hashmap_insert (property_header_p, name_p, prop_index);
+  }
+#endif /* ENABLED (JERRY_PROPRETY_HASHMAP) */
 
 #if ENABLED (JERRY_LCACHE)
   if (!ecma_is_property_lcached (property_p))

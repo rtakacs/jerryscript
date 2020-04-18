@@ -34,7 +34,7 @@
 typedef struct
 {
   ecma_property_index_t bucket_count; /**< number of buckets */
-  ecma_property_index_t property_count; /**<unused */
+  ecma_property_index_t property_count; /**< unused */
 } ecma_hashmap_header_t;
 
 /**
@@ -52,9 +52,9 @@ typedef struct
 typedef struct
 {
   jmem_cpointer_t next_cp; /**< next entry pointer */
-  ecma_property_index_t property_count; /* bucket entry counter */
+  ecma_property_index_t property_count; /**< bucket entry counter */
+  ecma_property_index_t unused_index; /**< next unused index */
 } ecma_hashmap_bucket_header_t;
-
 
 #if ENABLED (JERRY_PROPRETY_HASHMAP)
 

@@ -32,7 +32,7 @@
  * Compute the total size of the property hashmap.
  */
 #define ECMA_HASHMAP_GET_TOTAL_SIZE(count) \
-  (sizeof (ecma_hashmap_header_t) + count * sizeof (ecma_hashmap_entry_t))
+  (sizeof (ecma_hashmap_header_t) + count * sizeof (ecma_hashmap_bucket_header_t))
 
 /**
  * Insert az entry into a bucket.
@@ -46,21 +46,13 @@ ecma_property_hashmap_insert_into_bucket (ecma_hashmap_bucket_header_t *bucket_h
 
   bucket_header_p->property_count++;
 
-  if (bucket_header_p->next_cp != JMEM_CP_NULL)
+  if (bucket_header_p->next_cp != JMEM_CP_NULL && bucket_header_p->unused_index < ECMA_PROPERTY_HASHMAP_INDEX_SIZE)
   {
     ecma_hashmap_entry_t * entry_p = ECMA_GET_NON_NULL_POINTER (ecma_hashmap_entry_t,
                                                                 bucket_header_p->next_cp);
 
-    /* Find an empty place in the index[3] array */
-    for (uint8_t i = 0; i < ECMA_PROPERTY_HASHMAP_INDEX_SIZE; i++)
-    {
-      if (entry_p->index[i] == 0)
-      {
-        entry_p->index[i] = index;
-
-        return;
-      }
-    }
+    entry_p->index[bucket_header_p->unused_index++] = index;
+    return;
   }
 
   ecma_hashmap_entry_t *entry_p = jmem_heap_alloc_block (sizeof (ecma_hashmap_entry_t));
@@ -68,6 +60,9 @@ ecma_property_hashmap_insert_into_bucket (ecma_hashmap_bucket_header_t *bucket_h
 
   entry_p->next_cp = bucket_header_p->next_cp;
   entry_p->index[0] = index;
+
+  // Set the next index.
+  bucket_header_p->unused_index = 1;
 
   ECMA_SET_NON_NULL_POINTER (bucket_header_p->next_cp, entry_p);
 } /* ecma_property_hashmap_insert_into_bucket */
@@ -325,6 +320,7 @@ ecma_property_hashmap_find (ecma_property_header_t *property_header_p, /**< hash
     {
       ecma_hashmap_entry_t *entry_p = ECMA_GET_NON_NULL_POINTER (ecma_hashmap_entry_t, next_cp);
 
+      /* Empty chain cannot be exits. */
       JERRY_ASSERT ((entry_p->index[0] | entry_p->index[1] | entry_p->index[2]) != 0);
 
       for (uint8_t i = 0; i < ECMA_PROPERTY_HASHMAP_INDEX_SIZE; i++)

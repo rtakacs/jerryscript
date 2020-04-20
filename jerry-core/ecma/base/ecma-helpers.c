@@ -504,30 +504,14 @@ ecma_find_named_property (ecma_object_t *obj_p, /**< object to find property in 
 
   ecma_property_header_t *property_header_p = ECMA_GET_NON_NULL_POINTER (ecma_property_header_t,
                                                                          obj_p->u1.property_header_cp);
-  ecma_property_t *property_list_p = (ecma_property_t *) property_header_p;
 
 #if ENABLED (JERRY_PROPRETY_HASHMAP)
   if (property_header_p->cache[0] == 0)
   {
-    ecma_property_index_t property_index = ECMA_PROPERTY_INDEX_INVALID;
-    jmem_cpointer_t property_real_name_cp;
-
-    property_p = ecma_property_hashmap_find (property_header_p,
-                                             name_p,
-                                             &property_real_name_cp,
-                                             &property_index);
+    property_p = ecma_property_hashmap_find (obj_p, property_header_p, name_p);
 
     if (property_p != NULL)
     {
-#if ENABLED (JERRY_LCACHE)
-      if (!ecma_is_property_lcached (property_p))
-      {
-        ecma_lcache_insert (obj_p, property_real_name_cp, property_index, property_p);
-      }
-#else /* !ENABLED (JERRY_LCACHE) */
-      (void) property_index;
-#endif /* ENABLED (JERRY_LCACHE) */
-
       return property_p;
     }
   }
@@ -545,6 +529,8 @@ ecma_find_named_property (ecma_object_t *obj_p, /**< object to find property in 
   {
     ECMA_SET_NON_NULL_POINTER (prop_name_cp, name_p);
   }
+
+  ecma_property_t *property_list_p = (ecma_property_t *) property_header_p;
   ecma_property_index_t prop_index = ECMA_PROPERTY_LIST_PROPERTY_COUNT (property_header_p);
 
   if (property_header_p->cache[0] != 0)

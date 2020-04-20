@@ -15,6 +15,7 @@
 
 #include "ecma-globals.h"
 #include "ecma-helpers.h"
+#include "ecma-lcache.h"
 #include "ecma-property-hashmap.h"
 #include "jrt-libc-includes.h"
 #include "jcontext.h"
@@ -44,27 +45,31 @@ ecma_property_hashmap_insert_into_bucket (ecma_hashmap_bucket_header_t *bucket_h
   JERRY_ASSERT (bucket_header_p != 0);
   JERRY_ASSERT (index != ECMA_PROPERTY_INDEX_INVALID);
 
-  bucket_header_p->property_count++;
-
-  if (bucket_header_p->next_cp != JMEM_CP_NULL && bucket_header_p->unused_index < ECMA_PROPERTY_HASHMAP_INDEX_SIZE)
+  if (bucket_header_p->unused_index > 0)
   {
     ecma_hashmap_entry_t * entry_p = ECMA_GET_NON_NULL_POINTER (ecma_hashmap_entry_t,
                                                                 bucket_header_p->next_cp);
 
-    entry_p->index[bucket_header_p->unused_index++] = index;
-    return;
+    entry_p->index[bucket_header_p->unused_index] = index;
+
+    // Increase unused index and do a turnaround if necessary.
+    bucket_header_p->unused_index = (ecma_property_index_t)(bucket_header_p->unused_index + 1u) % ECMA_PROPERTY_HASHMAP_INDEX_SIZE;
+  }
+  else
+  {
+    ecma_hashmap_entry_t *entry_p = jmem_heap_alloc_block (sizeof (ecma_hashmap_entry_t));
+    memset (entry_p, 0, sizeof (ecma_hashmap_entry_t));
+
+    entry_p->next_cp = bucket_header_p->next_cp;
+    entry_p->index[0] = index;
+
+    // Set the next index.
+    bucket_header_p->unused_index = 1;
+
+    ECMA_SET_NON_NULL_POINTER (bucket_header_p->next_cp, entry_p);
   }
 
-  ecma_hashmap_entry_t *entry_p = jmem_heap_alloc_block (sizeof (ecma_hashmap_entry_t));
-  memset (entry_p, 0, sizeof (ecma_hashmap_entry_t));
-
-  entry_p->next_cp = bucket_header_p->next_cp;
-  entry_p->index[0] = index;
-
-  // Set the next index.
-  bucket_header_p->unused_index = 1;
-
-  ECMA_SET_NON_NULL_POINTER (bucket_header_p->next_cp, entry_p);
+  bucket_header_p->property_count++;
 } /* ecma_property_hashmap_insert_into_bucket */
 
 /**
@@ -246,6 +251,7 @@ ecma_property_hashmap_delete (ecma_property_header_t *property_header_p, /**< ob
             jmem_heap_free_block (entry_p, sizeof (ecma_hashmap_entry_t));
 
             bucket_p->property_count--;
+            bucket_p->unused_index = 0;
           }
 
           return ECMA_PROPERTY_HASHMAP_DELETE_HAS_HASHMAP;
@@ -261,14 +267,13 @@ ecma_property_hashmap_delete (ecma_property_header_t *property_header_p, /**< ob
 }
 
 ecma_property_t *
-ecma_property_hashmap_find (ecma_property_header_t *property_header_p, /**< hashmap */
-                            ecma_string_t *name_p, /**< property name */
-                            jmem_cpointer_t *property_real_name_cp, /**< [out] property real name */
-                            ecma_property_index_t *property_index) /**< [out] index of property */
+ecma_property_hashmap_find (ecma_object_t *obj_p, /**< object pointer */
+                            ecma_property_header_t *property_header_p, /**< property header pointer */
+                            ecma_string_t *name_p) /**< property name */
 {
-  JERRY_ASSERT (property_header_p != NULL);
+  JERRY_ASSERT (obj_p != NULL);
   JERRY_ASSERT (name_p != NULL);
-  JERRY_ASSERT (property_index != NULL);
+  JERRY_ASSERT (property_header_p != NULL);
   JERRY_ASSERT (property_header_p->cache[0] == 0);
 
   ecma_hashmap_header_t *hashmap_p = ECMA_GET_NON_NULL_POINTER (ecma_hashmap_header_t,
@@ -338,8 +343,12 @@ ecma_property_hashmap_find (ecma_property_header_t *property_header_p, /**< hash
             JERRY_ASSERT (property_found);
       #endif /* !JERRY_NDEBUG */
 
-            *property_real_name_cp = property_name_cp;
-            *property_index = entry_p->index[i];
+#if ENABLED (JERRY_LCACHE)
+            if (!ecma_is_property_lcached (curr_property_p))
+            {
+              ecma_lcache_insert (obj_p, property_name_cp, entry_p->index[i], curr_property_p);
+            }
+#endif /* !ENABLED (JERRY_LCACHE) */
 
             return curr_property_p;
           }
@@ -380,8 +389,12 @@ ecma_property_hashmap_find (ecma_property_header_t *property_header_p, /**< hash
             JERRY_ASSERT (property_found);
     #endif /* !JERRY_NDEBUG */
 
-            *property_real_name_cp = curr_property_p->name_cp;
-            *property_index = entry_p->index[i];
+#if ENABLED (JERRY_LCACHE)
+            if (!ecma_is_property_lcached (curr_property_p))
+            {
+              ecma_lcache_insert (obj_p, curr_property_p->name_cp, entry_p->index[i], curr_property_p);
+            }
+#endif /* !ENABLED (JERRY_LCACHE) */
 
             return curr_property_p;
           }

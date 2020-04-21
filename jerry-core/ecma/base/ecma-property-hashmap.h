@@ -33,27 +33,19 @@
  */
 typedef struct
 {
-  ecma_property_index_t bucket_count; /**< number of buckets */
   ecma_property_index_t property_count; /**< unused */
+  ecma_property_index_t bucket_count; /**< number of buckets */
 } ecma_hashmap_header_t;
-
-/**
- * Hashmap bucket entry.
- */
-typedef struct
-{
-  jmem_cpointer_t next_cp; /**< next entry pointer */
-  ecma_property_index_t index[ECMA_PROPERTY_HASHMAP_INDEX_SIZE]; /**< property indexes */
-} ecma_hashmap_entry_t;
 
 /**
  * Hashmap bucket header.
  */
 typedef struct
 {
-  jmem_cpointer_t next_cp; /**< next entry pointer */
-  ecma_property_index_t property_count; /**< bucket entry counter */
-  ecma_property_index_t unused_index; /**< next unused index */
+  jmem_cpointer_t index_list_cp; /**< property list pointer */
+  ecma_property_index_t capacity; /**< capacity */
+  ecma_property_index_t count; /**< property count */
+  ecma_property_index_t unused_index; /**< unused index */
 } ecma_hashmap_bucket_header_t;
 
 #if ENABLED (JERRY_PROPRETY_HASHMAP)

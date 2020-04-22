@@ -42,10 +42,10 @@ typedef struct
  */
 typedef struct
 {
-  jmem_cpointer_t index_list_cp; /**< property list pointer */
   ecma_property_index_t capacity; /**< capacity */
   ecma_property_index_t count; /**< property count */
   ecma_property_index_t unused_index; /**< unused index */
+  ecma_property_index_t index; /**< first property index */
 } ecma_hashmap_bucket_header_t;
 
 #if ENABLED (JERRY_PROPRETY_HASHMAP)

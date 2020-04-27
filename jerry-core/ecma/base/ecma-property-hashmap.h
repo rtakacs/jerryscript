@@ -24,11 +24,6 @@
  */
 
 /**
- * Number of indexes within a hashmap entry.
- */
-#define ECMA_PROPERTY_HASHMAP_INDEX_SIZE 3
-
-/**
  * Hashmap buckets.
  */
 typedef struct
@@ -44,14 +39,12 @@ typedef struct
 {
   ecma_property_index_t capacity; /**< capacity */
   ecma_property_index_t count; /**< property count */
-  ecma_property_index_t unused_index; /**< unused index */
-  ecma_property_index_t index; /**< first property index */
 } ecma_hashmap_bucket_header_t;
 
 #if ENABLED (JERRY_PROPRETY_HASHMAP)
 
-/* Recommended minimum number of items in a property cache. */
-#define ECMA_PROPERTY_HASMAP_MINIMUM_SIZE 32
+/* Recommended minimum number of items. */
+#define ECMA_PROPERTY_HASMAP_MINIMUM_SIZE 16
 
 /**
  * Simple ecma values

@@ -401,7 +401,7 @@ ecma_create_property (ecma_object_t *object_p, /**< the object */
   }
   else
   {
-    if (index >= (ECMA_PROPERTY_HASMAP_MINIMUM_SIZE >> 1))
+    if (index == ECMA_PROPERTY_HASMAP_MINIMUM_SIZE)
     {
       ecma_property_hashmap_create (property_header_p);
     }

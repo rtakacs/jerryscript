@@ -44,14 +44,15 @@ typedef struct
 {
   ecma_property_index_t capacity; /**< capacity */
   ecma_property_index_t count; /**< property count */
-  ecma_property_index_t unused_index; /**< unused index */
-  ecma_property_index_t index; /**< first property index */
+#if ENABLED (JERRY_CPOINTER_32_BIT)
+  ecma_property_index_t unused[2]; /**< unused */
+#endif /* ENABLED (JERRY_CPOINTER_32_BIT) */
 } ecma_hashmap_bucket_header_t;
 
 #if ENABLED (JERRY_PROPRETY_HASHMAP)
 
 /* Recommended minimum number of items in a property cache. */
-#define ECMA_PROPERTY_HASMAP_MINIMUM_SIZE 32
+#define ECMA_PROPERTY_HASMAP_MINIMUM_SIZE 8
 
 /**
  * Simple ecma values

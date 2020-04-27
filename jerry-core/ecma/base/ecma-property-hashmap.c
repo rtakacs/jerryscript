@@ -51,6 +51,47 @@
 #define ECMA_HASHMAP_GET_BUCKET_SIZE(capacity) \
   (sizeof (ecma_hashmap_bucket_header_t) + (capacity * sizeof (ecma_property_index_t)))
 
+
+/**
+ * Insert into bucket.
+ */
+static void
+ecma_property_hashmap_insert_into_bucket (jmem_cpointer_t *bucket_p, /**< bucket pointer */
+                                          ecma_property_index_t index) /**< property index */
+{
+  ecma_hashmap_bucket_header_t *bucket_header_p = NULL;
+
+  if (JERRY_UNLIKELY (*bucket_p == JMEM_CP_NULL))
+  {
+    size_t alloc_size = sizeof (ecma_hashmap_bucket_header_t) + ECMA_HASHMAP_CHUNK_SIZE;
+    bucket_header_p = jmem_heap_alloc_block (alloc_size);
+
+    memset (bucket_header_p, 0, alloc_size);
+
+    ECMA_SET_NON_NULL_POINTER (*bucket_p, bucket_header_p);
+    bucket_header_p->capacity = ECMA_HASHMAP_GROWTH_FACTOR;
+  }
+  else
+  {
+    bucket_header_p = ECMA_GET_NON_NULL_POINTER (ecma_hashmap_bucket_header_t, *bucket_p);
+
+    if (bucket_header_p->count == bucket_header_p->capacity)
+    {
+      size_t old_size = ECMA_HASHMAP_GET_BUCKET_SIZE (bucket_header_p->capacity);
+      size_t new_size = old_size + ECMA_HASHMAP_CHUNK_SIZE;
+
+      bucket_header_p = jmem_heap_realloc_block (bucket_header_p, old_size, new_size);
+      ECMA_SET_NON_NULL_POINTER (*bucket_p, bucket_header_p);
+
+      bucket_header_p->capacity = (ecma_property_index_t)(bucket_header_p->capacity + ECMA_HASHMAP_GROWTH_FACTOR);
+    }
+  }
+
+  ecma_property_index_t *index_start_p = (ecma_property_index_t *)(bucket_header_p + 1);
+  // Append property to the end of the list.
+  index_start_p[bucket_header_p->count++] = index;
+} /* ecma_property_hashmap_insert_into_bucket */
+
 /**
  * Create a new property hashmap for the object.
  * The object must not has a property hashmap.
@@ -66,12 +107,22 @@ ecma_property_hashmap_create (ecma_property_header_t *property_header_p) /**< ob
     return;
   }
 
-  if (property_header_p->count < (ECMA_PROPERTY_HASMAP_MINIMUM_SIZE >> 1))
-  {
-    return;
-  }
-
   ecma_property_index_t bucket_count = property_header_p->count >> 2;
+
+  /* Fast array case: if the amount of properties is not power of two */
+  if (JERRY_UNLIKELY ((bucket_count & (bucket_count - 1)) != 0))
+  {
+    bucket_count--;
+    bucket_count |= bucket_count >> 1;
+    bucket_count |= bucket_count >> 2;
+    bucket_count |= bucket_count >> 4;
+    bucket_count |= bucket_count >> 8;
+#if ENABLED (JERRY_CPOINTER_32_BIT)
+    bucket_count |= bucket_count >> 16;
+#endif /* ENABLED (JERRY_CPOINTER_32_BIT) */
+
+    bucket_count = (ecma_property_index_t) (bucket_count - (bucket_count >> 1));
+  }
 
   size_t total_size = ECMA_HASHMAP_GET_SIZE (bucket_count);
   ecma_hashmap_header_t *hashmap_p = jmem_heap_alloc_block_null_on_error (total_size);
@@ -83,10 +134,27 @@ ecma_property_hashmap_create (ecma_property_header_t *property_header_p) /**< ob
 
   memset (hashmap_p, 0, total_size);
   hashmap_p->bucket_count = bucket_count;
+  hashmap_p->property_count = property_header_p->count;
 
   /* Mark hashmap on the property list. */
   property_header_p->cache[0] = 0;
   ECMA_SET_NON_NULL_POINTER (property_header_p->cache[1], hashmap_p);
+
+  ecma_property_t *property_start_p = ECMA_PROPERTY_LIST_START (property_header_p);
+  jmem_cpointer_t *buckets_p = (jmem_cpointer_t *)(hashmap_p + 1);
+
+  for (ecma_property_index_t index = 0; index < property_header_p->count; index++)
+  {
+    ecma_property_t *curr_property_p = property_start_p + index;
+
+    if (ECMA_PROPERTY_IS_NAMED_PROPERTY (curr_property_p))
+    {
+      uint32_t hash = ecma_string_get_property_name_hash (curr_property_p);
+      uint32_t bucket_index = (uint32_t) (hash & (hashmap_p->bucket_count - 1u));
+
+      ecma_property_hashmap_insert_into_bucket (&buckets_p[bucket_index], (ecma_property_index_t)(index + 1u));
+    }
+  }
 } /* ecma_property_hashmap_create */
 
 /**
@@ -140,43 +208,21 @@ ecma_property_hashmap_insert (ecma_property_header_t *property_header_p, /**< ob
   ecma_hashmap_header_t *hashmap_p = ECMA_GET_NON_NULL_POINTER (ecma_hashmap_header_t,
                                                                 property_header_p->cache[1]);
 
+  /* If the object has more than two times properties, create a new ahsh table. */ 
+  if (property_header_p->count == hashmap_p->property_count << 1)
+  {
+    ecma_property_hashmap_free (property_header_p);
+    ecma_property_hashmap_create (property_header_p);
+    return;
+  }
+
   uint32_t hash = ecma_string_hash (name_p);
-  uint32_t bucket_index = hash % hashmap_p->bucket_count;
+  uint32_t bucket_index = (uint32_t)(hash & (hashmap_p->bucket_count - 1u));
 
   jmem_cpointer_t *buckets_p = (jmem_cpointer_t *)(hashmap_p + 1);
-  jmem_cpointer_t *bucket_cp = &buckets_p[bucket_index];
+  jmem_cpointer_t *bucket_p = &buckets_p[bucket_index];
 
-  ecma_hashmap_bucket_header_t *bucket_header_p = NULL;
-
-  if (JERRY_UNLIKELY (*bucket_cp == JMEM_CP_NULL))
-  {
-    size_t alloc_size = sizeof (ecma_hashmap_bucket_header_t) + ECMA_HASHMAP_CHUNK_SIZE;
-    bucket_header_p = jmem_heap_alloc_block (alloc_size);
-
-    memset (bucket_header_p, 0, alloc_size);
-
-    ECMA_SET_NON_NULL_POINTER (*bucket_cp, bucket_header_p);
-    bucket_header_p->capacity = ECMA_HASHMAP_GROWTH_FACTOR;
-  }
-  else
-  {
-    bucket_header_p = ECMA_GET_NON_NULL_POINTER (ecma_hashmap_bucket_header_t, *bucket_cp);
-
-    if (bucket_header_p->count == bucket_header_p->capacity)
-    {
-      size_t old_size = ECMA_HASHMAP_GET_BUCKET_SIZE (bucket_header_p->capacity);
-      size_t new_size = old_size + ECMA_HASHMAP_CHUNK_SIZE;
-
-      bucket_header_p = jmem_heap_realloc_block (bucket_header_p, old_size, new_size);
-      ECMA_SET_NON_NULL_POINTER (*bucket_cp, bucket_header_p);
-
-      bucket_header_p->capacity = (ecma_property_index_t)(bucket_header_p->capacity + ECMA_HASHMAP_GROWTH_FACTOR);
-    }
-  }
-
-  ecma_property_index_t *index_start_p = (ecma_property_index_t *)(bucket_header_p + 1);
-  // Append property to the end of the list.
-  index_start_p[bucket_header_p->count++] = index;
+  ecma_property_hashmap_insert_into_bucket (bucket_p, index);
 }
 
 ecma_property_hashmap_delete_status
@@ -189,7 +235,7 @@ ecma_property_hashmap_delete (ecma_property_header_t *property_header_p, /**< ob
                                                                 (jmem_cpointer_t) property_header_p->cache[1]);
 
   uint32_t hash = ecma_string_get_property_name_hash (property_p);
-  uint32_t bucket_index = hash % hashmap_p->bucket_count;
+  uint32_t bucket_index = (uint32_t)(hash & (hashmap_p->bucket_count - 1u));
 
   jmem_cpointer_t *buckets_p = (jmem_cpointer_t *)(hashmap_p + 1);
   jmem_cpointer_t bucket_cp = buckets_p[bucket_index];
@@ -214,6 +260,7 @@ ecma_property_hashmap_delete (ecma_property_header_t *property_header_p, /**< ob
       {
         index_list_p[i] = 0;
 
+        bucket_header_p->count--;
         return ECMA_PROPERTY_HASHMAP_DELETE_HAS_HASHMAP;
       }
     }
@@ -236,7 +283,7 @@ ecma_property_hashmap_find (ecma_object_t *obj_p, /**< object pointer */
                                                                 (jmem_cpointer_t) property_header_p->cache[1]);
 
   uint32_t hash = ecma_string_hash (name_p);
-  uint32_t bucket_index = hash % hashmap_p->bucket_count;
+  uint32_t bucket_index = (uint32_t)(hash & (hashmap_p->bucket_count - 1u));
 
   jmem_cpointer_t *buckets_p = (jmem_cpointer_t *)(hashmap_p + 1);
   jmem_cpointer_t bucket_cp = buckets_p[bucket_index];

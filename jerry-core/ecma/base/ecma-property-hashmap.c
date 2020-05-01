@@ -96,7 +96,7 @@ ecma_property_hashmap_create (ecma_property_header_t *property_header_p) /**< ob
   }
 
   /* Let bucket count is property count / 4. */
-  ecma_property_index_t bucket_count = property_header_p->count >> 2;
+  ecma_property_index_t bucket_count = property_header_p->count;
 
   /* If the bucket count is not power of two, round it to the previous power of two number.
    * Note: this can happen if fast arrays are converted to notmal objets. */

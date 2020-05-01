@@ -540,25 +540,12 @@ ecma_find_named_property (ecma_object_t *obj_p, /**< object to find property in 
 #if ENABLED (JERRY_PROPRETY_HASHMAP)
   if (property_header_p->count == 0)
   {
-    ecma_property_hashmap_t *hashmap_p = (ecma_property_hashmap_t *) property_header_p;
-    ecma_property_index_t property_index = ECMA_PROPERTY_INDEX_INVALID;
-    jmem_cpointer_t property_real_name_cp;
+    property_p = ecma_property_hashmap_find (obj_p, (ecma_property_hashmap_t *) property_header_p, name_p);
 
-    property_p = ecma_property_hashmap_find (hashmap_p,
-                                             name_p,
-                                             &property_real_name_cp,
-                                             &property_index);
-
-#if ENABLED (JERRY_LCACHE)
-    if (property_p != NULL
-        && !ecma_is_property_lcached (property_p))
+    if (property_p)
     {
-      ecma_lcache_insert (obj_p, property_real_name_cp, property_index, property_p);
+      return property_p;
     }
-#else /* !ENABLED (JERRY_LCACHE) */
-    (void) property_index;
-#endif /* ENABLED (JERRY_LCACHE) */
-    return property_p;
   }
 #endif /* ENABLED (JERRY_PROPRETY_HASHMAP) */
 

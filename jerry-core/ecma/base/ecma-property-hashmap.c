@@ -15,6 +15,7 @@
 
 #include "ecma-globals.h"
 #include "ecma-helpers.h"
+#include "ecma-lcache.h"
 #include "ecma-property-hashmap.h"
 #include "jrt-libc-includes.h"
 #include "jcontext.h"
@@ -90,25 +91,11 @@ ecma_property_hashmap_create (ecma_object_t *object_p) /**< object */
     return;
   }
 
-  uint32_t named_property_count = 0;
-
   ecma_property_header_t *property_header_p = ECMA_GET_NON_NULL_POINTER (ecma_property_header_t, prop_iter_cp);
   ecma_property_t *property_start_p = ECMA_PROPERTY_LIST_START (property_header_p);
   ecma_property_index_t property_count = ECMA_PROPERTY_LIST_PROPERTY_COUNT (property_header_p);
 
-  for (ecma_property_index_t i = 0; i < property_count; i++)
-  {
-    ecma_property_t *curr_property_p = property_start_p + i;
-
-    JERRY_ASSERT (ECMA_PROPERTY_IS_PROPERTY (curr_property_p));
-
-    if (ECMA_PROPERTY_IS_NAMED_PROPERTY (curr_property_p))
-    {
-      named_property_count++;
-    }
-  }
-
-  if (named_property_count < (ECMA_PROPERTY_HASMAP_MINIMUM_SIZE / 2))
+  if (property_count < (ECMA_PROPERTY_HASMAP_MINIMUM_SIZE / 2))
   {
     return;
   }
@@ -117,7 +104,7 @@ ecma_property_hashmap_create (ecma_object_t *object_p) /**< object */
   uint32_t max_property_count = ECMA_PROPERTY_HASMAP_MINIMUM_SIZE;
 
   /* At least 1/3 items must be NULL. */
-  while (max_property_count < (named_property_count + (named_property_count >> 1)))
+  while (max_property_count < (property_count + (property_count >> 1)))
   {
     max_property_count <<= 1;
   }
@@ -135,8 +122,8 @@ ecma_property_hashmap_create (ecma_object_t *object_p) /**< object */
   hashmap_p->count = 0;
   hashmap_p->property_header_cp = prop_iter_cp;
   hashmap_p->max_property_count = max_property_count;
-  hashmap_p->null_count = max_property_count - named_property_count;
-  hashmap_p->unused_count = max_property_count - named_property_count;
+  hashmap_p->null_count = max_property_count - property_count;
+  hashmap_p->unused_count = max_property_count - property_count;
 
   ecma_property_index_t *pair_list_p = (ecma_property_index_t *) (hashmap_p + 1);
   memset (pair_list_p, ECMA_PROPERTY_HASHMAP_FILL_PATTERN, entry_size);
@@ -334,15 +321,14 @@ ecma_property_hashmap_delete (ecma_object_t *object_p, /**< object */
  * @return pointer to the property if found or NULL otherwise
  */
 ecma_property_t *
-ecma_property_hashmap_find (ecma_property_hashmap_t *hashmap_p, /**< hashmap */
-                            ecma_string_t *name_p, /**< property name */
-                            jmem_cpointer_t *property_real_name_cp, /**< [out] property real name */
-                            ecma_property_index_t *property_index) /**< [out] index of property */
+ecma_property_hashmap_find (ecma_object_t *obj_p, /**< object */
+                            ecma_property_hashmap_t *hashmap_p, /**< hashmap */
+                            ecma_string_t *name_p) /**< property name */
 {
   JERRY_ASSERT (hashmap_p != NULL);
   JERRY_ASSERT (name_p != NULL);
-  JERRY_ASSERT (property_index != NULL);
   JERRY_ASSERT (hashmap_p->property_header_cp != JMEM_CP_NULL);
+
 
   ecma_property_header_t *property_header_p = ECMA_GET_NON_NULL_POINTER (ecma_property_header_t,
                                                                          hashmap_p->property_header_cp);
@@ -411,8 +397,12 @@ ecma_property_hashmap_find (ecma_property_hashmap_t *hashmap_p, /**< hashmap */
             JERRY_ASSERT (property_found);
   #endif /* !JERRY_NDEBUG */
 
-            *property_real_name_cp = property_name_cp;
-            *property_index = index;
+#if ENABLED (JERRY_LCACHE)
+            if (!ecma_is_property_lcached (curr_property_p))
+            {
+              ecma_lcache_insert (obj_p, property_name_cp, index, curr_property_p);
+            }
+#endif /* !ENABLED (JERRY_LCACHE) */
 
             return curr_property_p;
           }
@@ -457,8 +447,12 @@ ecma_property_hashmap_find (ecma_property_hashmap_t *hashmap_p, /**< hashmap */
             JERRY_ASSERT (property_found);
 #endif /* !JERRY_NDEBUG */
 
-            *property_real_name_cp = curr_property_p->name_cp;
-            *property_index = index;
+#if ENABLED (JERRY_LCACHE)
+            if (!ecma_is_property_lcached (curr_property_p))
+            {
+              ecma_lcache_insert (obj_p, curr_property_p->name_cp, index, curr_property_p);
+            }
+#endif /* !ENABLED (JERRY_LCACHE) */
 
             return curr_property_p;
           }

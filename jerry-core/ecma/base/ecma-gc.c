@@ -955,12 +955,12 @@ ecma_gc_free_properties (ecma_object_t *object_p) /**< object */
 
     JERRY_ASSERT (ECMA_PROPERTY_IS_PROPERTY (curr_property_p));
 
-    if (curr_property_p->type_flags != ECMA_PROPERTY_TYPE_DELETED)
+    if (JERRY_LIKELY(curr_property_p->type_flags != ECMA_PROPERTY_TYPE_DELETED))
     {
-      jmem_cpointer_t name_cp = curr_property_p->name_cp;
-
       if (ECMA_PROPERTY_GET_NAME_TYPE (curr_property_p) == ECMA_DIRECT_STRING_MAGIC)
       {
+        jmem_cpointer_t name_cp = curr_property_p->name_cp;
+
         /* Call the native's free callback. */
         if (JERRY_UNLIKELY (name_cp == LIT_INTERNAL_MAGIC_STRING_NATIVE_POINTER))
         {

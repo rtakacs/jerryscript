@@ -96,6 +96,8 @@ ecma_property_hashmap_create (ecma_object_t *object_p) /**< object */
   ecma_property_t *property_start_p = ECMA_PROPERTY_LIST_START (property_header_p);
   ecma_property_index_t property_count = ECMA_PROPERTY_LIST_PROPERTY_COUNT (property_header_p);
 
+  JERRY_ASSERT (property_header_p->count != 0);
+
   for (ecma_property_index_t i = 0; i < property_count; i++)
   {
     ecma_property_t *curr_property_p = property_start_p + i;

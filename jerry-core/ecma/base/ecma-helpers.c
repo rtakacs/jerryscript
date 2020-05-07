@@ -450,13 +450,6 @@ ecma_create_property (ecma_object_t *object_p, /**< the object */
   {
     ecma_property_hashmap_insert (object_p, name_p, index);
   }
-  else
-  {
-    if (index >= (ECMA_PROPERTY_HASMAP_MINIMUM_SIZE / 2))
-    {
-      ecma_property_hashmap_create (object_p);
-    }
-  }
 #endif /* ENABLED (JERRY_PROPRETY_HASHMAP) */
 
   return property_p;
@@ -596,6 +589,7 @@ ecma_find_named_property (ecma_object_t *obj_p, /**< object to find property in 
   }
   ecma_property_index_t prop_index = ECMA_PROPERTY_LIST_PROPERTY_COUNT (property_header_p);
 
+#if !ENABLED (JERRY_LCACHE)
   if (JERRY_LIKELY (prop_index > ECMA_PROPERTY_CACHE_SIZE))
   {
     for (uint32_t i = 0; i < ECMA_PROPERTY_CACHE_SIZE; i++)
@@ -604,17 +598,18 @@ ecma_find_named_property (ecma_object_t *obj_p, /**< object to find property in 
       if (JERRY_LIKELY (property_p->name_cp == prop_name_cp
                         && ECMA_PROPERTY_GET_NAME_TYPE (property_p) == prop_name_type))
       {
-#if ENABLED (JERRY_LCACHE)
-        prop_index = property_header_p->cache[i];
-        goto insert;
-#endif /* ENABLED (JERRY_LCACHE) */
         return property_p;
       }
     }
   }
+#endif /* !ENABLED (JERRY_LCACHE) */
+
+#if ENABLED (JERRY_PROPRETY_HASHMAP)
+  uint32_t steps = 0;
+#endif /* ENABLED (JERRY_PROPRETY_HASHMAP) */
 
   property_p = property_list_p;
-  ecma_property_t *property_list_end_p =  property_list_p + prop_index;
+  ecma_property_t *property_list_end_p = property_list_p + prop_index;
 
   if (ECMA_IS_DIRECT_STRING (name_p))
   {
@@ -629,6 +624,10 @@ ecma_find_named_property (ecma_object_t *obj_p, /**< object to find property in 
         prop_index = (ecma_property_index_t) (property_p - property_list_p);
         goto insert;
       }
+
+#if ENABLED (JERRY_PROPRETY_HASHMAP)
+      steps++;
+#endif /* ENABLED (JERRY_PROPRETY_HASHMAP) */
     }
     while (property_p < property_list_end_p);
   }
@@ -655,6 +654,9 @@ ecma_find_named_property (ecma_object_t *obj_p, /**< object to find property in 
           goto insert;
         }
       }
+#if ENABLED (JERRY_PROPRETY_HASHMAP)
+      steps++;
+#endif /* ENABLED (JERRY_PROPRETY_HASHMAP) */
     }
     while (property_p < property_list_end_p);
   }
@@ -663,6 +665,13 @@ ecma_find_named_property (ecma_object_t *obj_p, /**< object to find property in 
 
 insert:
   JERRY_ASSERT (prop_index != 0);
+
+#if ENABLED (JERRY_PROPRETY_HASHMAP)
+  if (steps >= (ECMA_PROPERTY_HASMAP_MINIMUM_SIZE / 2))
+  {
+    ecma_property_hashmap_create (obj_p);
+  }
+#endif /* ENABLED (JERRY_PROPRETY_HASHMAP) */
 
 #if ENABLED (JERRY_LCACHE)
   if (!ecma_is_property_lcached (property_p))

@@ -507,7 +507,7 @@ typedef struct
   ecma_property_value_t u; /**< value of the property */
   jmem_cpointer_t name_cp; /**< name of the property */
   uint8_t type_flags; /**< ecma_property_types_t (3 bit) and ecma_property_flags_t */
-  uint8_t prop_count; /**< unused */
+  uint8_t lcache_id; /**< lcache id */
 } ecma_property_t;
 
 /**
@@ -1702,8 +1702,10 @@ typedef uint32_t ecma_lcache_hash_entry_id_t;
  */
 typedef struct
 {
+  /** Pointer to a property of the object */
+  ecma_property_t *prop_p;
+
   ecma_lcache_hash_entry_id_t id; /**< Entry identifier in LCache */
-  ecma_property_index_t index; /**< Identifier on the property list */
 } ecma_lcache_hash_entry_t;
 
 /**

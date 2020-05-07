@@ -399,6 +399,26 @@ ecma_create_property (ecma_object_t *object_p, /**< the object */
 #endif /* ENABLED (JERRY_PROPRETY_HASHMAP) */
 
     property_header_p = ecma_realloc_property_list (property_header_p);
+
+#if ENABLED (JERRY_LCACHE)
+    ecma_property_t *start_property_p = ECMA_PROPERTY_LIST_START (property_header_p);
+    ecma_property_index_t loop_cnt = ECMA_PROPERTY_LIST_PROPERTY_COUNT (property_header_p);
+
+    /* Update the memory addresses of the properties. */
+    for (uint32_t i = 0; i < loop_cnt - 1u; i++)
+    {
+      ecma_property_t *property_p = start_property_p + i;
+
+      if (property_p->type_flags != ECMA_PROPERTY_TYPE_DELETED)
+      {
+        if (ecma_is_property_lcached (property_p))
+        {
+          ecma_lcache_hash_entry_t *entry_p = JERRY_CONTEXT (lcache)[0] + property_p->lcache_id;
+          entry_p->prop_p = property_p;
+        }
+      }
+    }
+#endif /* ENABLED (JERRY_LCACHE) */
   }
 
   ecma_property_index_t index = ECMA_PROPERTY_LIST_PROPERTY_COUNT (property_header_p);
@@ -408,7 +428,7 @@ ecma_create_property (ecma_object_t *object_p, /**< the object */
   property_p->name_cp = ecma_string_to_property_name (name_p, &name_type);
   property_p->type_flags = (uint8_t) (type_and_flags | name_type);
   property_p->u = value;
-  property_p->prop_count = 0;
+  property_p->lcache_id = 0;
 
   /* Update the property list references. */
 #if ENABLED (JERRY_PROPRETY_HASHMAP)
@@ -553,7 +573,7 @@ ecma_find_named_property (ecma_object_t *obj_p, /**< object to find property in 
     if (property_p != NULL
         && !ecma_is_property_lcached (property_p))
     {
-      ecma_lcache_insert (obj_p, property_real_name_cp, property_index, property_p);
+      ecma_lcache_insert (obj_p, property_real_name_cp, property_p);
     }
 #else /* !ENABLED (JERRY_LCACHE) */
     (void) property_index;
@@ -647,7 +667,7 @@ insert:
 #if ENABLED (JERRY_LCACHE)
   if (!ecma_is_property_lcached (property_p))
   {
-    ecma_lcache_insert (obj_p, prop_name_cp, prop_index, property_p);
+    ecma_lcache_insert (obj_p, prop_name_cp, property_p);
   }
 #else /* !ENABLED (JERRY_LCACHE) */
 #if !ENABLED (JERRY_CPOINTER_32_BIT)

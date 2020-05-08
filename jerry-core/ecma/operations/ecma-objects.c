@@ -2233,15 +2233,6 @@ ecma_op_object_get_property_names (ecma_object_t *obj_p, /**< object */
     else if (prop_iter_cp != JMEM_CP_NULL)
     {
       ecma_property_header_t *property_header_p = ECMA_GET_NON_NULL_POINTER (ecma_property_header_t, prop_iter_cp);
-
-#if ENABLED (JERRY_PROPRETY_HASHMAP)
-      if (property_header_p->count == 0)
-      {
-        ecma_property_hashmap_t *hashmap_p = (ecma_property_hashmap_t *) property_header_p;
-        property_header_p = ECMA_GET_NON_NULL_POINTER (ecma_property_header_t, hashmap_p->property_header_cp);
-      }
-#endif /* ENABLED (JERRY_PROPRETY_HASHMAP) */
-
       ecma_property_t *property_start_p = ECMA_PROPERTY_LIST_START (property_header_p);
       ecma_property_index_t property_count = ECMA_PROPERTY_LIST_PROPERTY_COUNT (property_header_p);
 

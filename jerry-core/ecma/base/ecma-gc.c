@@ -745,15 +745,6 @@ ecma_gc_mark (ecma_object_t *object_p) /**< object to mark from */
   }
 
   ecma_property_header_t *property_header_p = ECMA_GET_NON_NULL_POINTER (ecma_property_header_t, prop_iter_cp);
-
-#if ENABLED (JERRY_PROPRETY_HASHMAP)
-  if (property_header_p->count == 0)
-  {
-    ecma_property_hashmap_t *hashmap_p = (ecma_property_hashmap_t *) property_header_p;
-    property_header_p = ECMA_GET_NON_NULL_POINTER (ecma_property_header_t, hashmap_p->property_header_cp);
-  }
-#endif /* ENABLED (JERRY_PROPRETY_HASHMAP) */
-
   ecma_property_t *property_start_p = ECMA_PROPERTY_LIST_START (property_header_p);
   ecma_property_index_t property_count = ECMA_PROPERTY_LIST_PROPERTY_COUNT (property_header_p);
 
@@ -937,12 +928,9 @@ ecma_gc_free_properties (ecma_object_t *object_p) /**< object */
   ecma_property_header_t *property_header_p = ECMA_GET_NON_NULL_POINTER (ecma_property_header_t, prop_iter_cp);
 
 #if ENABLED (JERRY_PROPRETY_HASHMAP)
-  if (property_header_p->count == 0)
+  if (property_header_p->cache[0] == 0)
   {
-    ecma_property_hashmap_t *hashmap_p = (ecma_property_hashmap_t *) property_header_p;
-    property_header_p = ECMA_GET_NON_NULL_POINTER (ecma_property_header_t, hashmap_p->property_header_cp);
-
-    ecma_property_hashmap_free (object_p);
+    ecma_property_hashmap_free (property_header_p);
   }
 #endif /* ENABLED (JERRY_PROPRETY_HASHMAP) */
 
@@ -1539,9 +1527,9 @@ ecma_free_unused_memory (jmem_pressure_t pressure) /**< current pressure */
         {
           ecma_property_header_t *property_header_p = ECMA_GET_NON_NULL_POINTER (ecma_property_header_t, prop_iter_cp);
 
-          if (property_header_p->count == 0)
+          if (property_header_p->cache[0] == 0)
           {
-            ecma_property_hashmap_free (obj_iter_p);
+            ecma_property_hashmap_free (property_header_p);
           }
         }
       }

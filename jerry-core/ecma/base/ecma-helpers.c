@@ -661,6 +661,13 @@ ecma_find_named_property (ecma_object_t *obj_p, /**< object to find property in 
     while (property_p < property_list_end_p);
   }
 
+#if ENABLED (JERRY_PROPRETY_HASHMAP)
+  if (steps >= (ECMA_PROPERTY_HASMAP_MINIMUM_SIZE / 2))
+  {
+    ecma_property_hashmap_create (obj_p);
+  }
+#endif /* ENABLED (JERRY_PROPRETY_HASHMAP) */
+
   return NULL;
 
 insert:

@@ -630,7 +630,7 @@ ecma_find_named_property (ecma_object_t *obj_p, /**< object to find property in 
   }
 
 #if ENABLED (JERRY_PROPRETY_HASHMAP)
-  if (steps >= (ECMA_PROPERTY_HASMAP_MINIMUM_SIZE / 2))
+  if (steps >= ECMA_PROPERTY_HASMAP_MINIMUM_SIZE)
   {
     ecma_property_hashmap_create (property_header_p);
   }
@@ -642,7 +642,7 @@ insert:
   JERRY_ASSERT (prop_index != 0);
 
 #if ENABLED (JERRY_PROPRETY_HASHMAP)
-  if (steps >= (ECMA_PROPERTY_HASMAP_MINIMUM_SIZE / 2))
+  if (steps >= ECMA_PROPERTY_HASMAP_MINIMUM_SIZE)
   {
     ecma_property_hashmap_create (property_header_p);
   }

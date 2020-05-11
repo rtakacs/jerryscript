@@ -411,13 +411,16 @@ ecma_create_property (ecma_object_t *object_p, /**< the object */
   JMEM_CP_SET_NON_NULL_POINTER (object_p->u1.property_header_cp, property_header_p);
 
 #if ENABLED (JERRY_PROPRETY_HASHMAP)
-  /* The property must be fully initialized before ecma_property_hashmap_insert
-   * is called, because the insert operation may reallocate the hashmap, and
-   * that triggers garbage collection which scans all properties of all objects.
-   * A not fully initialized but queued property may cause a crash. */
   if (property_header_p->cache[0] == 0)
   {
     ecma_property_hashmap_insert (property_header_p, name_p, index);
+  }
+  else
+  {
+    if (index >= ECMA_PROPERTY_HASMAP_MINIMUM_SIZE)
+    {
+      ecma_property_hashmap_create (property_header_p);
+    }
   }
 #endif /* ENABLED (JERRY_PROPRETY_HASHMAP) */
 
@@ -572,10 +575,6 @@ ecma_find_named_property (ecma_object_t *obj_p, /**< object to find property in 
   }
 #endif /* !ENABLED (JERRY_LCACHE) */
 
-#if ENABLED (JERRY_PROPRETY_HASHMAP)
-  uint32_t steps = 0;
-#endif /* ENABLED (JERRY_PROPRETY_HASHMAP) */
-
   property_p = property_list_p;
   ecma_property_t *property_list_end_p = property_list_p + prop_index;
 
@@ -592,10 +591,6 @@ ecma_find_named_property (ecma_object_t *obj_p, /**< object to find property in 
         prop_index = (ecma_property_index_t) (property_p - property_list_p);
         goto insert;
       }
-
-#if ENABLED (JERRY_PROPRETY_HASHMAP)
-      steps++;
-#endif /* ENABLED (JERRY_PROPRETY_HASHMAP) */
     }
     while (property_p < property_list_end_p);
   }
@@ -622,31 +617,14 @@ ecma_find_named_property (ecma_object_t *obj_p, /**< object to find property in 
           goto insert;
         }
       }
-#if ENABLED (JERRY_PROPRETY_HASHMAP)
-      steps++;
-#endif /* ENABLED (JERRY_PROPRETY_HASHMAP) */
     }
     while (property_p < property_list_end_p);
   }
-
-#if ENABLED (JERRY_PROPRETY_HASHMAP)
-  if (steps >= ECMA_PROPERTY_HASMAP_MINIMUM_SIZE)
-  {
-    ecma_property_hashmap_create (property_header_p);
-  }
-#endif /* ENABLED (JERRY_PROPRETY_HASHMAP) */
 
   return NULL;
 
 insert:
   JERRY_ASSERT (prop_index != 0);
-
-#if ENABLED (JERRY_PROPRETY_HASHMAP)
-  if (steps >= ECMA_PROPERTY_HASMAP_MINIMUM_SIZE)
-  {
-    ecma_property_hashmap_create (property_header_p);
-  }
-#endif /* ENABLED (JERRY_PROPRETY_HASHMAP) */
 
 #if ENABLED (JERRY_LCACHE)
   if (!ecma_is_property_lcached (property_p))

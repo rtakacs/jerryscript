@@ -59,19 +59,6 @@
   (sizeof (ecma_property_hashmap_t) + ECMA_PROPERTY_HASHMAP_GET_ENTRY_SIZE (max_property_count))
 
 /**
- * Number of items in the stepping table.
- */
-#define ECMA_PROPERTY_HASHMAP_NUMBER_OF_STEPS 8
-
-/**
- * Stepping values for searching items in the hashmap.
- */
-static const uint8_t ecma_property_hashmap_steps[ECMA_PROPERTY_HASHMAP_NUMBER_OF_STEPS] JERRY_ATTR_CONST_DATA =
-{
-  3, 5, 7, 11, 13, 17, 19, 23
-};
-
-/**
  * Create a new property hashmap for the object.
  * The object must not have a property hashmap.
  */
@@ -136,7 +123,6 @@ ecma_property_hashmap_create (ecma_property_header_t *property_header_p) /**< ob
     if (ECMA_PROPERTY_IS_NAMED_PROPERTY (curr_property_p))
     {
       uint32_t entry_index = ecma_string_get_property_name_hash (curr_property_p);
-      uint32_t step = ecma_property_hashmap_steps[entry_index & (ECMA_PROPERTY_HASHMAP_NUMBER_OF_STEPS - 1)];
 
       entry_index &= mask;
 #ifndef JERRY_NDEBUG
@@ -151,7 +137,7 @@ ecma_property_hashmap_create (ecma_property_header_t *property_header_p) /**< ob
 
       while (pair_list_p[entry_index] < ECMA_PROPERTY_HASHMAP_DIRTY_ENTRY)
       {
-        entry_index = (entry_index + step) & mask;
+        entry_index = (entry_index + 1) & mask;
 
 #ifndef JERRY_NDEBUG
         JERRY_ASSERT (entry_index != start_entry_index);
@@ -210,7 +196,6 @@ ecma_property_hashmap_insert (ecma_property_header_t *property_header_p, /**< ob
   }
 
   uint32_t entry_index = ecma_string_hash (name_p);
-  uint32_t step = ecma_property_hashmap_steps[entry_index & (ECMA_PROPERTY_HASHMAP_NUMBER_OF_STEPS - 1)];
   uint32_t mask = hashmap_p->max_property_count - 1;
   entry_index &= mask;
 
@@ -223,7 +208,7 @@ ecma_property_hashmap_insert (ecma_property_header_t *property_header_p, /**< ob
 
   while (pair_list_p[entry_index] < ECMA_PROPERTY_HASHMAP_DIRTY_ENTRY)
   {
-    entry_index = (entry_index + step) & mask;
+    entry_index = (entry_index + 1) & mask;
 
 #ifndef JERRY_NDEBUG
     JERRY_ASSERT (entry_index != start_entry_index);
@@ -270,7 +255,6 @@ ecma_property_hashmap_delete (ecma_property_header_t *property_header_p, /**< ob
   }
 
   uint32_t entry_index = ecma_string_get_property_name_hash (property_p);
-  uint32_t step = ecma_property_hashmap_steps[entry_index & (ECMA_PROPERTY_HASHMAP_NUMBER_OF_STEPS - 1)];
   uint32_t mask = hashmap_p->max_property_count - 1;
   ecma_property_index_t *pair_list_p = (ecma_property_index_t *) (hashmap_p + 1);
 
@@ -298,7 +282,7 @@ ecma_property_hashmap_delete (ecma_property_header_t *property_header_p, /**< ob
       }
     }
 
-    entry_index = (entry_index + step) & mask;
+    entry_index = (entry_index + 1) & mask;
 
 #ifndef JERRY_NDEBUG
     JERRY_ASSERT (entry_index != start_entry_index);
@@ -353,7 +337,6 @@ ecma_property_hashmap_find (ecma_property_header_t *property_header_p, /**< hash
 #endif /* !JERRY_NDEBUG */
 
   uint32_t entry_index = ecma_string_hash (name_p);
-  uint32_t step = ecma_property_hashmap_steps[entry_index & (ECMA_PROPERTY_HASHMAP_NUMBER_OF_STEPS - 1)];
   uint32_t mask = hashmap_p->max_property_count - 1;
   ecma_property_index_t *pair_list_p = (ecma_property_index_t *) (hashmap_p + 1);
   entry_index &= mask;
@@ -405,7 +388,7 @@ ecma_property_hashmap_find (ecma_property_header_t *property_header_p, /**< hash
         return NULL;
       }
 
-      entry_index = (entry_index + step) & mask;
+      entry_index = (entry_index + 1) & mask;
 
 #ifndef JERRY_NDEBUG
       JERRY_ASSERT (entry_index != start_entry_index);
@@ -452,7 +435,7 @@ ecma_property_hashmap_find (ecma_property_header_t *property_header_p, /**< hash
       return NULL;
     }
 
-    entry_index = (entry_index + step) & mask;
+    entry_index = (entry_index + 1) & mask;
 
 #ifndef JERRY_NDEBUG
     JERRY_ASSERT (entry_index != start_entry_index);

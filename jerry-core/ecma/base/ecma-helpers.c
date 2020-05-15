@@ -382,7 +382,7 @@ ecma_create_property (ecma_object_t *object_p, /**< the object */
     ecma_property_t *property_start_p = ECMA_PROPERTY_LIST_START (property_header_p);
     ecma_property_index_t loop_cnt = ECMA_PROPERTY_LIST_PROPERTY_COUNT (property_header_p);
 
-    /* Update the memory addresses of the properties. */
+    /* Update the memory addresses of the properties in LCache. */
     for (uint32_t i = 0; i < loop_cnt - 1u; i++)
     {
       ecma_property_t *property_p = property_start_p + i;
@@ -411,16 +411,13 @@ ecma_create_property (ecma_object_t *object_p, /**< the object */
   JMEM_CP_SET_NON_NULL_POINTER (object_p->u1.property_header_cp, property_header_p);
 
 #if ENABLED (JERRY_PROPRETY_HASHMAP)
-  if (property_header_p->cache[0] == 0)
+  if (JERRY_LIKELY (property_header_p->cache[0] == 0))
   {
     ecma_property_hashmap_insert (property_header_p, name_p, index);
   }
   else
   {
-    if (index >= ECMA_PROPERTY_HASMAP_MINIMUM_SIZE)
-    {
-      ecma_property_hashmap_create (property_header_p);
-    }
+    ecma_property_hashmap_create (property_header_p);
   }
 #endif /* ENABLED (JERRY_PROPRETY_HASHMAP) */
 

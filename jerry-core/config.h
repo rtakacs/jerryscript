@@ -224,7 +224,7 @@
  * Default value: 1
  */
 #ifndef JERRY_LCACHE
-# define JERRY_LCACHE 1
+# define JERRY_LCACHE 0
 #endif /* !defined (JERRY_LCACHE) */
 
 /**

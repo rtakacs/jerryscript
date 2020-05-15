@@ -248,7 +248,7 @@ ecma_fast_array_convert_to_normal (ecma_object_t *object_p) /**< fast access mod
   ext_obj_p->u.array.u.length_prop = (uint8_t) (ext_obj_p->u.array.u.length_prop & ~ECMA_FAST_ARRAY_FLAG);
 
 #if ENABLED (JERRY_PROPRETY_HASHMAP)
-  if (prop_count >= ECMA_PROPERTY_HASMAP_MINIMUM_SIZE)
+  if (property_header_p)
   {
     ecma_property_hashmap_create (property_header_p);
   }

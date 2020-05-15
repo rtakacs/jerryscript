@@ -75,11 +75,6 @@ ecma_property_hashmap_create (ecma_property_header_t *property_header_p) /**< ob
 
   ecma_property_index_t property_count = ECMA_PROPERTY_LIST_PROPERTY_COUNT (property_header_p);
 
-  if (property_count < (ECMA_PROPERTY_HASMAP_MINIMUM_SIZE / 2))
-  {
-    return;
-  }
-
   /* The max_property_count must be power of 2. */
   uint32_t max_property_count = ECMA_PROPERTY_HASMAP_MINIMUM_SIZE;
 
@@ -188,7 +183,7 @@ ecma_property_hashmap_insert (ecma_property_header_t *property_header_p, /**< ob
                                                                   property_header_p->cache[1]);
 
   /* The NULLs are reduced below 1/8 of the hashmap. */
-  if (hashmap_p->null_count < (hashmap_p->max_property_count >> 3))
+  if (hashmap_p->null_count <= (hashmap_p->max_property_count >> 3))
   {
     ecma_property_hashmap_free (property_header_p);
     ecma_property_hashmap_create (property_header_p);

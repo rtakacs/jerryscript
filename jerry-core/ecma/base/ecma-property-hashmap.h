@@ -26,7 +26,7 @@
 /**
  * Recommended minimum number of items in a property cache.
  */
-#define ECMA_PROPERTY_HASMAP_MINIMUM_SIZE 32
+#define ECMA_PROPERTY_HASMAP_MINIMUM_SIZE 8
 
 /**
  * Property hash.

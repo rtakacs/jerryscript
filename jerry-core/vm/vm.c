@@ -1527,17 +1527,16 @@ vm_loop (vm_frame_ctx_t *frame_ctx_p) /**< frame context */
             prop_attributes = ECMA_PROPERTY_FLAG_ENUMERABLE;
           }
 
-          ecma_property_value_t *property_value_p;
-          property_value_p = ecma_create_named_data_property (frame_ctx_p->lex_env_p,
-                                                              name_p,
-                                                              prop_attributes,
-                                                              NULL);
+          ecma_property_t *property_p;
+          property_p = ecma_create_named_data_property (frame_ctx_p->lex_env_p,
+                                                        name_p,
+                                                        prop_attributes);
 
-          JERRY_ASSERT (property_value_p->value == ECMA_VALUE_UNDEFINED);
+          JERRY_ASSERT (property_p->u.value == ECMA_VALUE_UNDEFINED);
 
           ecma_value_t value = *(--stack_top_p);
 
-          property_value_p->value = value;
+          property_p->u.value = value;
           ecma_deref_if_object (value);
           continue;
         }

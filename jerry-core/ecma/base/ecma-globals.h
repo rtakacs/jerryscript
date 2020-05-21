@@ -1702,9 +1702,7 @@ typedef uint32_t ecma_lcache_hash_entry_id_t;
  */
 typedef struct
 {
-  /** Pointer to a property of the object */
-  ecma_property_t *prop_p;
-
+  ecma_property_index_t prop_idx;   /**< Index to a property of the object */
   ecma_lcache_hash_entry_id_t id; /**< Entry identifier in LCache */
 } ecma_lcache_hash_entry_t;
 

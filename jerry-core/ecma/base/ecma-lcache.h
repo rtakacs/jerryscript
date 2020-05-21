@@ -25,10 +25,12 @@
 
 #if ENABLED (JERRY_LCACHE)
 ecma_property_t *ecma_lcache_lookup (const ecma_object_t *object_p, const ecma_string_t *prop_name_p);
-void ecma_lcache_invalidate (const ecma_object_t *object_p, ecma_property_t *property_p);
 void ecma_lcache_insert (const ecma_object_t *object_p,
                          const jmem_cpointer_t name_cp,
                          const ecma_property_index_t prop_index);
+#if 0
+void ecma_lcache_invalidate (const ecma_object_t *object_p, ecma_property_t *property_p);
+#endif
 #endif /* ENABLED (JERRY_LCACHE) */
 
 /**

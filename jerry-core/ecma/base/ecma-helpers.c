@@ -689,7 +689,7 @@ ecma_free_property (ecma_object_t *object_p, /**< object the property belongs to
     }
   }
 
-#if ENABLED (JERRY_LCACHE)
+#if 0
   ecma_lcache_invalidate (object_p, property_p);
 #endif /* ENABLED (JERRY_LCACHE) */
 

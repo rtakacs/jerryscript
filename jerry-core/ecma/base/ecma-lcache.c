@@ -181,6 +181,7 @@ ecma_lcache_lookup (const ecma_object_t *object_p, /**< object */
   return NULL;
 } /* ecma_lcache_lookup */
 
+#if 0
 /**
  * Invalidate LCache entries associated with given object and property name / property
  */
@@ -215,6 +216,7 @@ ecma_lcache_invalidate (const ecma_object_t *object_p, /**< object */
   }
   while (entry_p < entry_end_p);
 } /* ecma_lcache_invalidate */
+#endif
 
 #endif /* ENABLED (JERRY_LCACHE) */
 

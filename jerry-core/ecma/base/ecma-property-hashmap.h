@@ -33,6 +33,8 @@
  */
 typedef struct
 {
+  ecma_property_index_t count; /**< hashmap marker */
+  jmem_cpointer_t property_header_cp; /**< property list */
   uint32_t max_property_count; /**< maximum property count (power of 2) */
   uint32_t null_count; /**< number of NULLs in the map */
   uint32_t unused_count; /**< number of unused entires in the map */
@@ -64,13 +66,13 @@ typedef enum
   ECMA_PROPERTY_HASHMAP_DELETE_RECREATE_HASHMAP, /**< hashmap should be recreated */
 } ecma_property_hashmap_delete_status;
 
-void ecma_property_hashmap_create (ecma_property_header_t *property_header_p);
-void ecma_property_hashmap_free (ecma_property_header_t *property_header_p);
-void ecma_property_hashmap_insert (ecma_property_header_t *property_header_p, ecma_string_t *name_p, ecma_property_index_t index);
-ecma_property_hashmap_delete_status ecma_property_hashmap_delete (ecma_property_header_t *property_header_p,
+void ecma_property_hashmap_create (ecma_object_t *object_p);
+void ecma_property_hashmap_free (ecma_object_t *object_p);
+void ecma_property_hashmap_insert (ecma_object_t *object_p, ecma_string_t *name_p, ecma_property_index_t index);
+ecma_property_hashmap_delete_status ecma_property_hashmap_delete (ecma_object_t *object_p,
                                                                   ecma_property_t *property_p);
 
-ecma_property_t *ecma_property_hashmap_find (ecma_property_header_t *property_header_p, ecma_string_t *name_p,
+ecma_property_t *ecma_property_hashmap_find (ecma_property_hashmap_t *hashmap_p, ecma_string_t *name_p,
                                              jmem_cpointer_t *property_real_name_cp, ecma_property_index_t *index);
 #endif /* ENABLED (JERRY_PROPRETY_HASHMAP) */
 

@@ -430,13 +430,6 @@ ecma_create_property (ecma_object_t *object_p, /**< the object */
   {
     ecma_property_hashmap_insert (object_p, name_p, index);
   }
-  else
-  {
-    if (index >= (ECMA_PROPERTY_HASMAP_MINIMUM_SIZE / 2))
-    {
-      ecma_property_hashmap_create (object_p);
-    }
-  }
 #endif /* ENABLED (JERRY_PROPRETY_HASHMAP) */
 
   return property_p;
@@ -562,6 +555,10 @@ ecma_find_named_property (ecma_object_t *obj_p, /**< object to find property in 
   }
 #endif /* ENABLED (JERRY_PROPRETY_HASHMAP) */
 
+#if ENABLED (JERRY_PROPRETY_HASHMAP)
+  uint32_t steps = 0;
+#endif /* ENABLED (JERRY_PROPRETY_HASHMAP) */
+
   uint8_t prop_name_type = ECMA_DIRECT_STRING_PTR;
   jmem_cpointer_t prop_name_cp;
 
@@ -609,6 +606,10 @@ ecma_find_named_property (ecma_object_t *obj_p, /**< object to find property in 
         prop_index = (ecma_property_index_t) (property_p - property_list_p);
         goto insert;
       }
+
+#if ENABLED (JERRY_PROPRETY_HASHMAP)
+      steps++;
+#endif /* ENABLED (JERRY_PROPRETY_HASHMAP) */
     }
     while (property_p < property_list_end_p);
   }
@@ -635,14 +636,32 @@ ecma_find_named_property (ecma_object_t *obj_p, /**< object to find property in 
           goto insert;
         }
       }
+
+#if ENABLED (JERRY_PROPRETY_HASHMAP)
+      steps++;
+#endif /* ENABLED (JERRY_PROPRETY_HASHMAP) */
     }
     while (property_p < property_list_end_p);
   }
+
+#if ENABLED (JERRY_PROPRETY_HASHMAP)
+  if (steps >= ECMA_PROPERTY_HASMAP_MINIMUM_SIZE)
+  {
+    ecma_property_hashmap_create (obj_p);
+  }
+#endif /* ENABLED (JERRY_PROPRETY_HASHMAP) */
 
   return NULL;
 
 insert:
   JERRY_ASSERT (prop_index != 0);
+
+#if ENABLED (JERRY_PROPRETY_HASHMAP)
+  if (steps >= ECMA_PROPERTY_HASMAP_MINIMUM_SIZE)
+  {
+    ecma_property_hashmap_create (obj_p);
+  }
+#endif /* ENABLED (JERRY_PROPRETY_HASHMAP) */
 
 #if ENABLED (JERRY_LCACHE)
   if (!ecma_is_property_lcached (property_p))

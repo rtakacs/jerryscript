@@ -573,23 +573,6 @@ ecma_find_named_property (ecma_object_t *obj_p, /**< object to find property in 
   }
   ecma_property_index_t prop_index = ECMA_PROPERTY_LIST_PROPERTY_COUNT (property_header_p);
 
-  if (JERRY_LIKELY (prop_index > ECMA_PROPERTY_CACHE_SIZE))
-  {
-    for (uint32_t i = 0; i < ECMA_PROPERTY_CACHE_SIZE; i++)
-    {
-      property_p = property_list_p + property_header_p->cache[i];
-      if (JERRY_LIKELY (property_p->name_cp == prop_name_cp
-                        && ECMA_PROPERTY_GET_NAME_TYPE (property_p) == prop_name_type))
-      {
-#if ENABLED (JERRY_LCACHE)
-        prop_index = property_header_p->cache[i];
-        goto insert;
-#endif /* ENABLED (JERRY_LCACHE) */
-        return property_p;
-      }
-    }
-  }
-
   property_p = property_list_p;
   ecma_property_t *property_list_end_p =  property_list_p + prop_index;
 
@@ -668,12 +651,6 @@ insert:
   {
     ecma_lcache_insert (obj_p, prop_name_cp, prop_index, property_p);
   }
-#else /* !ENABLED (JERRY_LCACHE) */
-#if !ENABLED (JERRY_CPOINTER_32_BIT)
-  property_header_p->cache[2] = property_header_p->cache[1];
-#endif /* !ENABLED (JERRY_CPOINTER_32_BIT) */
-  property_header_p->cache[1] = property_header_p->cache[0];
-  property_header_p->cache[0] = prop_index;
 #endif /* ENABLED (JERRY_LCACHE) */
 
   return property_p;

@@ -226,11 +226,6 @@ ecma_alloc_property_list (uint32_t count) /**< amount of properties */
 
   property_header_p->count = (ecma_property_index_t) count;
 
-  for (uint32_t i = 0; i < ECMA_PROPERTY_CACHE_SIZE; i++)
-  {
-    property_header_p->cache[i] = 1;
-  }
-
   return property_header_p;
 } /* ecma_alloc_property_list */
 

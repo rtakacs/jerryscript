@@ -82,12 +82,6 @@ ecma_lcache_invalidate_entry (ecma_lcache_hash_entry_t *entry_p) /**< entry to i
   }
 #endif /* ENABLED (JERRY_PROPRETY_HASHMAP) */
 
-#if !ENABLED (JERRY_CPOINTER_32_BIT)
-  property_header_p->cache[2] = property_header_p->cache[1];
-#endif /* !ENABLED (JERRY_CPOINTER_32_BIT) */
-  property_header_p->cache[1] = property_header_p->cache[0];
-  property_header_p->cache[0] = (ecma_property_index_t) entry_p->index;
-
   ecma_property_t *property_p = (ecma_property_t *) property_header_p + entry_p->index;
 
   JERRY_ASSERT (ecma_is_property_lcached (property_p));

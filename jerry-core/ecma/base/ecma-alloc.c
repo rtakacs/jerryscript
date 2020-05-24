@@ -217,14 +217,14 @@ ecma_dealloc_string_buffer (ecma_string_t *string_p, /**< string with data */
 ecma_property_header_t *
 ecma_alloc_property_list (uint32_t count) /**< amount of properties */
 {
-  size_t alloc_size = sizeof (ecma_property_header_t) + (count * sizeof (ecma_property_t));
+  size_t alloc_size = count * sizeof (ecma_property_t);
 
 #if ENABLED (JERRY_MEM_STATS)
   jmem_stats_allocate_property_bytes (alloc_size);
 #endif /* ENABLED (JERRY_MEM_STATS) */
   ecma_property_header_t *property_header_p = jmem_heap_alloc_block (alloc_size);
 
-  property_header_p->count = (ecma_property_index_t) count;
+  ecma_set_property_count (property_header_p, count);
 
   return property_header_p;
 } /* ecma_alloc_property_list */
@@ -237,7 +237,9 @@ ecma_alloc_property_list (uint32_t count) /**< amount of properties */
 ecma_property_header_t *
 ecma_realloc_property_list (ecma_property_header_t *current_header_p) /**< property list pointer */
 {
-  size_t old_alloc_size = sizeof (ecma_property_header_t) + (current_header_p->count * sizeof (ecma_property_t));
+  ecma_property_index_t length = ecma_get_property_count (current_header_p);
+
+  size_t old_alloc_size = length * sizeof (ecma_property_t);
   size_t new_alloc_size = old_alloc_size + sizeof (ecma_property_t);
 
 #if ENABLED (JERRY_MEM_STATS)
@@ -247,7 +249,7 @@ ecma_realloc_property_list (ecma_property_header_t *current_header_p) /**< prope
 
   ecma_property_header_t *new_header_p = jmem_heap_realloc_block (current_header_p, old_alloc_size, new_alloc_size);
   /* Update the counter field. */
-  new_header_p->count++;
+  ecma_set_property_count (new_header_p, length + 1u);
 
   return new_header_p;
 } /* ecma_realloc_property_list */
@@ -258,7 +260,7 @@ ecma_realloc_property_list (ecma_property_header_t *current_header_p) /**< prope
 void
 ecma_dealloc_property_list (ecma_property_header_t *property_header_p) /**< property list pointer */
 {
-  size_t alloc_size = sizeof (ecma_property_header_t) + (property_header_p->count * sizeof (ecma_property_t));
+  size_t alloc_size = ecma_get_property_count (property_header_p) * sizeof (ecma_property_t);
 
 #if ENABLED (JERRY_MEM_STATS)
   jmem_stats_free_property_bytes (alloc_size);

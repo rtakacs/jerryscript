@@ -2251,7 +2251,7 @@ ecma_op_object_get_property_names (ecma_object_t *obj_p, /**< object */
       ecma_property_header_t *property_header_p = ECMA_GET_NON_NULL_POINTER (ecma_property_header_t, prop_iter_cp);
 
 #if ENABLED (JERRY_PROPRETY_HASHMAP)
-      if (property_header_p->count == 0)
+      if (property_header_p->type_flags == ECMA_SPECIAL_PROPERTY_HASHMAP)
       {
         ecma_property_hashmap_t *hashmap_p = (ecma_property_hashmap_t *) property_header_p;
         property_header_p = ECMA_GET_NON_NULL_POINTER (ecma_property_header_t, hashmap_p->property_header_cp);

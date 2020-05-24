@@ -432,7 +432,6 @@ typedef enum
 {
   ECMA_SPECIAL_PROPERTY_HASHMAP, /**< hashmap property */
   ECMA_SPECIAL_PROPERTY_DELETED, /**< deleted property */
-  ECMA_SPECIAL_PROPERTY_COUNTER, /**< counter property */
 
   ECMA_SPECIAL_PROPERTY__COUNT /**< Number of special property types */
 } ecma_special_property_id_t;
@@ -452,11 +451,6 @@ typedef enum
  * Type of hash-map property.
  */
 #define ECMA_PROPERTY_TYPE_HASHMAP ECMA_SPECIAL_PROPERTY_VALUE (ECMA_SPECIAL_PROPERTY_HASHMAP)
-
-/**
- * Type of hash-map property.
- */
-#define ECMA_PROPERTY_TYPE_COUNTER ECMA_SPECIAL_PROPERTY_VALUE (ECMA_SPECIAL_PROPERTY_COUNTER)
 
 /**
  * Type of property not found.
@@ -492,23 +486,16 @@ typedef union
 
 /**
  * Property descriptor.
- *
- * Note:
- *  The memory layout of a property list is a linear sequence of properties.
- *  It starts with a special counter property that tracks the number of the
- *  allocated properties. After that, the concrete properties follow.
- *
- *  +------------------+------------+-----------+-----+------------+
- *  | Counter property | property 1 | property 2| ... | property N |
- *  +------------------+------------+-----------+-----+------------+
  */
 typedef struct
 {
-  ecma_property_value_t u; /**< value of the property */
-  jmem_cpointer_t name_cp; /**< name of the property */
   uint8_t type_flags; /**< ecma_property_types_t (3 bit) and ecma_property_flags_t */
   uint8_t prop_count; /**< unused */
+  jmem_cpointer_t name_cp; /**< name of the property */
+  ecma_property_value_t u; /**< value of the property */
 } ecma_property_t;
+
+typedef ecma_property_t ecma_property_header_t;
 
 /**
  * Property index identifier.
@@ -518,18 +505,6 @@ typedef uint32_t ecma_property_index_t;
 #else /* !ENABLED (JERRY_CPOINTER_32_BIT) */
 typedef uint16_t ecma_property_index_t;
 #endif /* ENABLED (JERRY_CPOINTER_32_BIT) */
-
-#if ENABLED (JERRY_CPOINTER_32_BIT)
-#define ECMA_PROPERTY_CACHE_SIZE 2
-#else /* !ENABLED (JERRY_CPOINTER_32_BIT) */
-#define ECMA_PROPERTY_CACHE_SIZE 3
-#endif /* ENABLED (JERRY_CPOINTER_32_BIT) */
-
-typedef struct
-{
-  ecma_property_index_t count; /**< value of the property */
-  ecma_property_index_t cache[ECMA_PROPERTY_CACHE_SIZE]; /**< value of the property */
-} ecma_property_header_t;
 
 /**
  * Invalid property index.
@@ -544,13 +519,13 @@ typedef struct
  * First property value of the property list.
  */
 #define ECMA_PROPERTY_LIST_START(property_header_p) \
-  ((ecma_property_t *) (property_header_p + 1u))
+  ((ecma_property_t *) (property_header_p))
 
 /**
  * Number of property entries in the property list.
  */
 #define ECMA_PROPERTY_LIST_PROPERTY_COUNT(property_header_p) \
-  ((ecma_property_index_t) property_header_p->count)
+  ((ecma_property_index_t) ecma_get_property_count (property_header_p))
 
 /**
  * Get property type.

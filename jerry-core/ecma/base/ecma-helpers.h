@@ -436,6 +436,8 @@ ecma_lexical_environment_type_t JERRY_ATTR_PURE ecma_get_lex_env_type (const ecm
 ecma_object_t JERRY_ATTR_PURE *ecma_get_lex_env_binding_object (const ecma_object_t *object_p);
 ecma_object_t *ecma_clone_decl_lexical_environment (ecma_object_t *lex_env_p, bool copy_values);
 
+void ecma_set_property_count (ecma_property_t *property_p, uint32_t count);
+ecma_property_index_t ecma_get_property_count (ecma_property_t *property_p);
 ecma_property_t *
 ecma_create_named_data_property (ecma_object_t *object_p, ecma_string_t *name_p, uint8_t prop_attributes);
 ecma_property_t *

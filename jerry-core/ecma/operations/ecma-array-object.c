@@ -188,7 +188,7 @@ ecma_fast_array_convert_to_normal (ecma_object_t *object_p) /**< fast access mod
     if (hole_count == 0)
     {
       size_t old_alloc_size = aligned_length * sizeof (ecma_value_t);
-      size_t new_alloc_size = sizeof (ecma_property_header_t) + (prop_count * sizeof (ecma_property_t));
+      size_t new_alloc_size = prop_count * sizeof (ecma_property_t);
 
       property_header_p = (ecma_property_header_t *) jmem_heap_realloc_block (values_p, old_alloc_size, new_alloc_size);
       ecma_property_t *property_start_p = ECMA_PROPERTY_LIST_START (property_header_p);
@@ -208,12 +208,7 @@ ecma_fast_array_convert_to_normal (ecma_object_t *object_p) /**< fast access mod
       jmem_stats_allocate_property_bytes (new_alloc_size);
   #endif /* ENABLED (JERRY_MEM_STATS) */
 
-      for (uint32_t i = 0; i < ECMA_PROPERTY_CACHE_SIZE; i++)
-      {
-        property_header_p->cache[i] = 1;
-      }
-
-      property_header_p->count = (ecma_property_index_t) prop_count;
+      ecma_set_property_count(property_header_p, prop_count);
     }
     else
     {
@@ -836,7 +831,7 @@ ecma_delete_array_properties (ecma_object_t *object_p, /**< object */
 #if ENABLED (JERRY_PROPRETY_HASHMAP)
   bool has_hashmap = false;
 
-  if (property_header_p->count == 0)
+  if (property_header_p->type_flags == ECMA_SPECIAL_PROPERTY_HASHMAP)
   {
     ecma_property_hashmap_t *hashmap_p = (ecma_property_hashmap_t *) property_header_p;
     property_header_p = ECMA_GET_NON_NULL_POINTER (ecma_property_header_t, hashmap_p->property_header_cp);

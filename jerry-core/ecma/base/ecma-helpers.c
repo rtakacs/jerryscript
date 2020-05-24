@@ -317,7 +317,7 @@ ecma_clone_decl_lexical_environment (ecma_object_t *lex_env_p, /**< declarative 
   ecma_property_header_t *property_header_p = ECMA_GET_NON_NULL_POINTER (ecma_property_header_t, prop_iter_cp);
 
 #if ENABLED (JERRY_PROPRETY_HASHMAP)
-  if (property_header_p->count == 0)
+  if (property_header_p->type_flags == ECMA_SPECIAL_PROPERTY_HASHMAP)
   {
     ecma_property_hashmap_t *hashmap_p = (ecma_property_hashmap_t *) property_header_p;
     property_header_p = ECMA_GET_NON_NULL_POINTER (ecma_property_header_t, hashmap_p->property_header_cp);
@@ -391,7 +391,7 @@ ecma_create_property (ecma_object_t *object_p, /**< the object */
     property_header_p = ECMA_GET_NON_NULL_POINTER (ecma_property_header_t, object_p->u1.property_header_cp);
 
 #if ENABLED (JERRY_PROPRETY_HASHMAP)
-    if (property_header_p->count == 0)
+    if (property_header_p->type_flags == ECMA_SPECIAL_PROPERTY_HASHMAP)
     {
       hashmap_p = (ecma_property_hashmap_t *) property_header_p;
       property_header_p = ECMA_GET_NON_NULL_POINTER (ecma_property_header_t, hashmap_p->property_header_cp);
@@ -401,14 +401,13 @@ ecma_create_property (ecma_object_t *object_p, /**< the object */
     property_header_p = ecma_realloc_property_list (property_header_p);
   }
 
-  ecma_property_index_t index = ECMA_PROPERTY_LIST_PROPERTY_COUNT (property_header_p);
+  ecma_property_index_t index = (ecma_property_index_t) (ECMA_PROPERTY_LIST_PROPERTY_COUNT (property_header_p) - 1u);
   ecma_property_t *property_p = ((ecma_property_t *) property_header_p) + index;
 
   uint8_t name_type;
   property_p->name_cp = ecma_string_to_property_name (name_p, &name_type);
   property_p->type_flags = (uint8_t) (type_and_flags | name_type);
   property_p->u = value;
-  property_p->prop_count = 0;
 
   /* Update the property list references. */
 #if ENABLED (JERRY_PROPRETY_HASHMAP)
@@ -434,6 +433,36 @@ ecma_create_property (ecma_object_t *object_p, /**< the object */
 
   return property_p;
 } /* ecma_create_property */
+
+inline void JERRY_ATTR_ALWAYS_INLINE
+ecma_set_property_count (ecma_property_t *property_p, /**< property pointer */
+                         uint32_t count) /**< count */
+{
+  /* TODO: remove it later. Now, we support maximum 16K properties. */
+  JERRY_ASSERT (count < 0x3fff);
+
+  if (JERRY_LIKELY (count <= 0x7f))
+  {
+    property_p->prop_count = (uint8_t) count;
+  }
+  else
+  {
+    property_p[0].prop_count = (uint8_t)(0x80 | (count >> 8));
+    property_p[1].prop_count = (uint8_t)(count & 0xff);
+  }
+} /* ecma_set_property_count */
+
+inline ecma_property_index_t JERRY_ATTR_ALWAYS_INLINE
+ecma_get_property_count (ecma_property_t *property_p) /**< property pointer */
+{
+  if (JERRY_LIKELY ((property_p[0].prop_count & 0x80) == 0))
+  {
+    return property_p[0].prop_count;
+  }
+
+  return (ecma_property_index_t)(((property_p[0].prop_count & ~0x80) << 8) | property_p[1].prop_count);
+} /* ecma_get_property_count */
+
 
 /**
  * Create named data property with given name, attributes and undefined value
@@ -531,7 +560,7 @@ ecma_find_named_property (ecma_object_t *obj_p, /**< object to find property in 
   ecma_property_t *property_list_p = (ecma_property_t *) property_header_p;
 
 #if ENABLED (JERRY_PROPRETY_HASHMAP)
-  if (property_header_p->count == 0)
+  if (property_header_p->type_flags == ECMA_SPECIAL_PROPERTY_HASHMAP)
   {
     ecma_property_hashmap_t *hashmap_p = (ecma_property_hashmap_t *) property_header_p;
     ecma_property_index_t property_index = ECMA_PROPERTY_INDEX_INVALID;
@@ -574,7 +603,7 @@ ecma_find_named_property (ecma_object_t *obj_p, /**< object to find property in 
   ecma_property_index_t prop_index = ECMA_PROPERTY_LIST_PROPERTY_COUNT (property_header_p);
 
   property_p = property_list_p;
-  ecma_property_t *property_list_end_p =  property_list_p + prop_index;
+  ecma_property_t *property_list_end_p = property_list_p + prop_index;
 
   if (ECMA_IS_DIRECT_STRING (name_p))
   {
@@ -582,14 +611,13 @@ ecma_find_named_property (ecma_object_t *obj_p, /**< object to find property in 
 
     do
     {
-      property_p++;
-
       if (property_p->name_cp == prop_name_cp && ECMA_PROPERTY_GET_NAME_TYPE (property_p) == prop_name_type)
       {
         prop_index = (ecma_property_index_t) (property_p - property_list_p);
         goto insert;
       }
 
+      property_p++;
 #if ENABLED (JERRY_PROPRETY_HASHMAP)
       steps++;
 #endif /* ENABLED (JERRY_PROPRETY_HASHMAP) */
@@ -600,8 +628,6 @@ ecma_find_named_property (ecma_object_t *obj_p, /**< object to find property in 
   {
     do
     {
-      property_p++;
-
       if (ECMA_PROPERTY_GET_NAME_TYPE (property_p) == ECMA_DIRECT_STRING_PTR)
       {
         if (prop_name_cp == property_p->name_cp)
@@ -620,6 +646,7 @@ ecma_find_named_property (ecma_object_t *obj_p, /**< object to find property in 
         }
       }
 
+      property_p++;
 #if ENABLED (JERRY_PROPRETY_HASHMAP)
       steps++;
 #endif /* ENABLED (JERRY_PROPRETY_HASHMAP) */
@@ -637,8 +664,6 @@ ecma_find_named_property (ecma_object_t *obj_p, /**< object to find property in 
   return NULL;
 
 insert:
-  JERRY_ASSERT (prop_index != 0);
-
 #if ENABLED (JERRY_PROPRETY_HASHMAP)
   if (steps >= ECMA_PROPERTY_HASMAP_MINIMUM_SIZE)
   {
@@ -754,7 +779,7 @@ ecma_delete_property (ecma_object_t *object_p, /**< object */
 #if ENABLED (JERRY_PROPRETY_HASHMAP)
   ecma_property_hashmap_delete_status hashmap_status = ECMA_PROPERTY_HASHMAP_DELETE_NO_HASHMAP;
 
-  if (property_header_p->count == 0)
+  if (property_header_p->type_flags == ECMA_SPECIAL_PROPERTY_HASHMAP)
   {
     hashmap_status = ECMA_PROPERTY_HASHMAP_DELETE_HAS_HASHMAP;
 
@@ -815,7 +840,7 @@ ecma_assert_object_contains_the_property (const ecma_object_t *object_p, /**< ec
   ecma_property_header_t *property_header_p = ECMA_GET_NON_NULL_POINTER (ecma_property_header_t, prop_iter_cp);
 
 #if ENABLED (JERRY_PROPRETY_HASHMAP)
-  if (property_header_p->count == 0)
+  if (property_header_p->type_flags == ECMA_SPECIAL_PROPERTY_HASHMAP)
   {
     ecma_property_hashmap_t *hashmap_p = (ecma_property_hashmap_t *) property_header_p;
     property_header_p = ECMA_GET_NON_NULL_POINTER (ecma_property_header_t, hashmap_p->property_header_cp);

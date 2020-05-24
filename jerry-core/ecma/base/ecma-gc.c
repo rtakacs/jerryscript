@@ -747,7 +747,7 @@ ecma_gc_mark (ecma_object_t *object_p) /**< object to mark from */
   ecma_property_header_t *property_header_p = ECMA_GET_NON_NULL_POINTER (ecma_property_header_t, prop_iter_cp);
 
 #if ENABLED (JERRY_PROPRETY_HASHMAP)
-  if (property_header_p->count == 0)
+  if (property_header_p->type_flags == ECMA_SPECIAL_PROPERTY_HASHMAP)
   {
     ecma_property_hashmap_t *hashmap_p = (ecma_property_hashmap_t *) property_header_p;
     property_header_p = ECMA_GET_NON_NULL_POINTER (ecma_property_header_t, hashmap_p->property_header_cp);
@@ -937,7 +937,7 @@ ecma_gc_free_properties (ecma_object_t *object_p) /**< object */
   ecma_property_header_t *property_header_p = ECMA_GET_NON_NULL_POINTER (ecma_property_header_t, prop_iter_cp);
 
 #if ENABLED (JERRY_PROPRETY_HASHMAP)
-  if (property_header_p->count == 0)
+  if (property_header_p->type_flags == ECMA_SPECIAL_PROPERTY_HASHMAP)
   {
     ecma_property_hashmap_t *hashmap_p = (ecma_property_hashmap_t *) property_header_p;
     property_header_p = ECMA_GET_NON_NULL_POINTER (ecma_property_header_t, hashmap_p->property_header_cp);
@@ -1539,7 +1539,7 @@ ecma_free_unused_memory (jmem_pressure_t pressure) /**< current pressure */
         {
           ecma_property_header_t *property_header_p = ECMA_GET_NON_NULL_POINTER (ecma_property_header_t, prop_iter_cp);
 
-          if (property_header_p->count == 0)
+          if (property_header_p->type_flags == ECMA_SPECIAL_PROPERTY_HASHMAP)
           {
             ecma_property_hashmap_free (obj_iter_p);
           }

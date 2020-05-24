@@ -132,7 +132,7 @@ ecma_property_hashmap_create (ecma_object_t *object_p) /**< object */
     return;
   }
 
-  hashmap_p->count = 0;
+  hashmap_p->type_flags = ECMA_SPECIAL_PROPERTY_HASHMAP;
   hashmap_p->property_header_cp = prop_iter_cp;
   hashmap_p->max_property_count = max_property_count;
   hashmap_p->null_count = max_property_count - named_property_count;
@@ -178,7 +178,7 @@ ecma_property_hashmap_create (ecma_object_t *object_p) /**< object */
 #endif /* !JERRY_NDEBUG */
       }
 
-      pair_list_p[entry_index] = (ecma_property_index_t) (i + 1u);
+      pair_list_p[entry_index] = (ecma_property_index_t) i;
     }
   }
 } /* ecma_property_hashmap_create */
@@ -196,7 +196,7 @@ ecma_property_hashmap_free (ecma_object_t *object_p) /**< object */
   ecma_property_header_t *property_header_p = ECMA_GET_NON_NULL_POINTER (ecma_property_header_t,
                                                                          object_p->u1.property_header_cp);
 
-  JERRY_ASSERT (property_header_p->count == 0);
+  JERRY_ASSERT (property_header_p->type_flags == ECMA_SPECIAL_PROPERTY_HASHMAP);
 
   ecma_property_hashmap_t *hashmap_p = (ecma_property_hashmap_t *) property_header_p;
 
@@ -220,7 +220,7 @@ ecma_property_hashmap_insert (ecma_object_t *object_p, /**< object */
   ecma_property_hashmap_t *hashmap_p = ECMA_GET_NON_NULL_POINTER (ecma_property_hashmap_t,
                                                                   object_p->u1.property_header_cp);
 
-  JERRY_ASSERT (hashmap_p->count == 0);
+  JERRY_ASSERT (hashmap_p->type_flags == ECMA_SPECIAL_PROPERTY_HASHMAP);
 
   /* The NULLs are reduced below 1/8 of the hashmap. */
   if (hashmap_p->null_count < (hashmap_p->max_property_count >> 3))
@@ -278,7 +278,7 @@ ecma_property_hashmap_delete (ecma_object_t *object_p, /**< object */
   ecma_property_hashmap_t *hashmap_p = ECMA_GET_NON_NULL_POINTER (ecma_property_hashmap_t,
                                                                   object_p->u1.property_header_cp);
 
-  JERRY_ASSERT (hashmap_p->count == 0);
+  JERRY_ASSERT (hashmap_p->type_flags == ECMA_SPECIAL_PROPERTY_HASHMAP);
 
   hashmap_p->unused_count++;
 

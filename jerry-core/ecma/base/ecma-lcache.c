@@ -56,40 +56,6 @@
   (((ecma_lcache_hash_entry_id_t) (object_cp) << ECMA_LCACHE_HASH_ENTRY_ID_SHIFT) | (name_cp))
 
 /**
- * Invalidate specified LCache entry
- */
-static inline void JERRY_ATTR_ALWAYS_INLINE
-ecma_lcache_invalidate_entry (ecma_lcache_hash_entry_t *entry_p) /**< entry to invalidate */
-{
-  JERRY_ASSERT (entry_p != NULL);
-  JERRY_ASSERT (entry_p->id != 0);
-  JERRY_ASSERT (entry_p->index != ECMA_PROPERTY_INDEX_INVALID);
-
-  ecma_object_t *obj_p = ECMA_GET_NON_NULL_POINTER (ecma_object_t,
-                                                    (uintptr_t) (entry_p->id >> ECMA_LCACHE_HASH_ENTRY_ID_SHIFT));
-
-  JERRY_ASSERT (ecma_is_lexical_environment (obj_p)
-                || !ecma_op_object_is_fast_array ((ecma_object_t *) obj_p));
-
-  ecma_property_header_t *property_header_p = ECMA_GET_NON_NULL_POINTER (ecma_property_header_t,
-                                                                         obj_p->u1.property_header_cp);
-
-#if ENABLED (JERRY_PROPRETY_HASHMAP)
-  if (property_header_p->type_flags == ECMA_SPECIAL_PROPERTY_HASHMAP)
-  {
-    ecma_property_hashmap_t *hashmap_p = (ecma_property_hashmap_t *) property_header_p;
-    property_header_p = ECMA_GET_NON_NULL_POINTER (ecma_property_header_t, hashmap_p->property_header_cp);
-  }
-#endif /* ENABLED (JERRY_PROPRETY_HASHMAP) */
-
-  ecma_property_t *property_p = (ecma_property_t *) property_header_p + entry_p->index;
-
-  JERRY_ASSERT (ecma_is_property_lcached (property_p));
-  ecma_set_property_lcached (property_p, false);
-  entry_p->id = 0;
-} /* ecma_lcache_invalidate_entry */
-
-/**
  * Compute the row index of object / property name pair
  *
  * @return row index
@@ -113,7 +79,7 @@ ecma_lcache_insert (const ecma_object_t *object_p, /**< object */
                     ecma_property_t *property_p) /**< property */
 {
   JERRY_ASSERT (object_p != NULL);
-  JERRY_ASSERT (property_p != NULL && !ecma_is_property_lcached (property_p));
+  JERRY_ASSERT (property_p != NULL);
   JERRY_ASSERT (property_index != ECMA_PROPERTY_INDEX_INVALID);
   JERRY_ASSERT (ecma_is_lexical_environment (object_p)
                 || !ecma_op_object_is_fast_array ((ecma_object_t *) object_p));
@@ -140,9 +106,6 @@ ecma_lcache_insert (const ecma_object_t *object_p, /**< object */
   }
   while (entry_p < entry_end_p);
 
-  /* Invalidate the last entry. */
-  ecma_lcache_invalidate_entry (--entry_p);
-
   /* Shift other entries towards the end. */
   for (uint32_t i = 0; i < ECMA_LCACHE_HASH_ROW_LENGTH - 1; i++)
   {
@@ -154,8 +117,6 @@ ecma_lcache_insert (const ecma_object_t *object_p, /**< object */
 insert:
   entry_p->index = property_index;
   entry_p->id = ECMA_LCACHE_CREATE_ID (object_cp, name_cp);
-
-  ecma_set_property_lcached (property_p, true);
 } /* ecma_lcache_insert */
 
 /**
@@ -210,7 +171,7 @@ ecma_lcache_lookup (const ecma_object_t *object_p, /**< object */
 
       ecma_property_t *property_p = (ecma_property_t *) property_header_p + entry_p->index;
 
-      JERRY_ASSERT (property_p != NULL && ecma_is_property_lcached (property_p));
+      JERRY_ASSERT (property_p != NULL);
 
       if (JERRY_LIKELY (ECMA_PROPERTY_GET_NAME_TYPE (property_p) == prop_name_type))
       {
@@ -232,7 +193,7 @@ ecma_lcache_invalidate (const ecma_object_t *object_p, /**< object */
                         ecma_property_t *property_p) /**< property */
 {
   JERRY_ASSERT (object_p != NULL);
-  JERRY_ASSERT (property_p != NULL && ecma_is_property_lcached (property_p));
+  JERRY_ASSERT (property_p != NULL);
   JERRY_ASSERT (ECMA_PROPERTY_GET_TYPE (property_p) == ECMA_PROPERTY_TYPE_NAMEDDATA
                 || ECMA_PROPERTY_GET_TYPE (property_p) == ECMA_PROPERTY_TYPE_NAMEDACCESSOR
                 || ECMA_PROPERTY_GET_TYPE (property_p) == ECMA_PROPERTY_TYPE_INTERNAL);
@@ -242,23 +203,20 @@ ecma_lcache_invalidate (const ecma_object_t *object_p, /**< object */
 
   size_t row_index = ecma_lcache_row_index (object_cp, property_p->name_cp);
   ecma_lcache_hash_entry_t *entry_p = JERRY_CONTEXT (lcache) [row_index];
+  ecma_lcache_hash_entry_t *entry_end_p = entry_p + ECMA_LCACHE_HASH_ROW_LENGTH;
   ecma_lcache_hash_entry_id_t id = ECMA_LCACHE_CREATE_ID (object_cp, property_p->name_cp);
 
-  while (true)
+  do
   {
-    /* The property must be present. */
-    JERRY_ASSERT ((entry_p - JERRY_CONTEXT (lcache) [row_index]) < ECMA_LCACHE_HASH_ROW_LENGTH);
-
     if (entry_p->id == id)
     {
-      ecma_set_property_lcached (property_p, false);
       entry_p->id = 0;
       return;
     }
+
     entry_p++;
   }
-
-  JERRY_UNREACHABLE ();
+  while (entry_p < entry_end_p);
 } /* ecma_lcache_invalidate */
 
 #endif /* ENABLED (JERRY_LCACHE) */

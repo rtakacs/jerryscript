@@ -572,8 +572,7 @@ ecma_find_named_property (ecma_object_t *obj_p, /**< object to find property in 
                                              &property_index);
 
 #if ENABLED (JERRY_LCACHE)
-    if (property_p != NULL
-        && !ecma_is_property_lcached (property_p))
+    if (property_p != NULL)
     {
       ecma_lcache_insert (obj_p, property_real_name_cp, property_index, property_p);
     }
@@ -672,10 +671,7 @@ insert:
 #endif /* ENABLED (JERRY_PROPRETY_HASHMAP) */
 
 #if ENABLED (JERRY_LCACHE)
-  if (!ecma_is_property_lcached (property_p))
-  {
-    ecma_lcache_insert (obj_p, prop_name_cp, prop_index, property_p);
-  }
+  ecma_lcache_insert (obj_p, prop_name_cp, prop_index, property_p);
 #endif /* ENABLED (JERRY_LCACHE) */
 
   return property_p;
@@ -745,10 +741,7 @@ ecma_free_property (ecma_object_t *object_p, /**< object the property belongs to
   }
 
 #if ENABLED (JERRY_LCACHE)
-  if (ecma_is_property_lcached (property_p))
-  {
-    ecma_lcache_invalidate (object_p, property_p);
-  }
+  ecma_lcache_invalidate (object_p, property_p);
 #endif /* ENABLED (JERRY_LCACHE) */
 
   if (ECMA_PROPERTY_GET_NAME_TYPE (property_p) == ECMA_DIRECT_STRING_PTR)
@@ -1043,46 +1036,6 @@ ecma_set_property_configurable_attr (ecma_property_t *property_p, /**< [in,out] 
     property_p->type_flags = (uint8_t) (property_p->type_flags & ~ECMA_PROPERTY_FLAG_CONFIGURABLE);
   }
 } /* ecma_set_property_configurable_attr */
-
-#if ENABLED (JERRY_LCACHE)
-
-/**
- * Check whether the property is registered in LCache
- *
- * @return true / false
- */
-inline bool JERRY_ATTR_ALWAYS_INLINE
-ecma_is_property_lcached (ecma_property_t *property_p) /**< property */
-{
-  JERRY_ASSERT (ECMA_PROPERTY_GET_TYPE (property_p) == ECMA_PROPERTY_TYPE_NAMEDDATA
-                || ECMA_PROPERTY_GET_TYPE (property_p) == ECMA_PROPERTY_TYPE_NAMEDACCESSOR
-                || ECMA_PROPERTY_GET_TYPE (property_p) == ECMA_PROPERTY_TYPE_INTERNAL);
-
-  return (property_p->type_flags & ECMA_PROPERTY_FLAG_LCACHED) != 0;
-} /* ecma_is_property_lcached */
-
-/**
- * Set value of flag indicating whether the property is registered in LCache
- */
-inline void JERRY_ATTR_ALWAYS_INLINE
-ecma_set_property_lcached (ecma_property_t *property_p, /**< property */
-                           bool is_lcached) /**< new value for lcached flag */
-{
-  JERRY_ASSERT (ECMA_PROPERTY_GET_TYPE (property_p) == ECMA_PROPERTY_TYPE_NAMEDDATA
-                || ECMA_PROPERTY_GET_TYPE (property_p) == ECMA_PROPERTY_TYPE_NAMEDACCESSOR
-                || ECMA_PROPERTY_GET_TYPE (property_p) == ECMA_PROPERTY_TYPE_INTERNAL);
-
-  if (is_lcached)
-  {
-    property_p->type_flags = (uint8_t) (property_p->type_flags | ECMA_PROPERTY_FLAG_LCACHED);
-  }
-  else
-  {
-    property_p->type_flags = (uint8_t) (property_p->type_flags & ~ECMA_PROPERTY_FLAG_LCACHED);
-  }
-} /* ecma_set_property_lcached */
-
-#endif /* ENABLED (JERRY_LCACHE) */
 
 /**
  * Construct empty property descriptor, i.e.:

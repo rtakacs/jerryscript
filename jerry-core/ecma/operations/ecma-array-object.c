@@ -181,40 +181,51 @@ ecma_fast_array_convert_to_normal (ecma_object_t *object_p) /**< fast access mod
 
   ecma_ref_object (object_p);
 
-  ecma_property_pair_t *property_pair_p = NULL;
-  jmem_cpointer_t next_property_pair_cp = JMEM_CP_NULL;
-
+  uint32_t prop_count = length - ecma_fast_array_get_hole_count (object_p);
+  uint32_t pair_count = (prop_count >> 1) + (prop_count & 1);
   uint32_t prop_index = 1;
   int32_t index = (int32_t) (length - 1);
 
-  while (index >= 0)
+  ecma_property_pair_t *property_pair_p = jmem_heap_alloc_block (pair_count * sizeof (ecma_property_pair_t));
+  jmem_cpointer_t next_property_pair_cp = JMEM_CP_NULL;
+
+  if (JERRY_LIKELY (prop_count > 0))
   {
-    if (ecma_is_value_array_hole (values_p[index]))
+    property_pair_p--;
+
+    while (index >= 0)
     {
+      if (ecma_is_value_array_hole (values_p[index]))
+      {
+        index--;
+        continue;
+      }
+
+      if (prop_index == 1)
+      {
+        property_pair_p++;
+        property_pair_p->header.next_property_cp = next_property_pair_cp;
+        ECMA_SET_NON_NULL_POINTER (next_property_pair_cp, property_pair_p);
+      }
+
+      JERRY_ASSERT (index <= ECMA_DIRECT_STRING_MAX_IMM);
+
+      property_pair_p->names_cp[prop_index] = (jmem_cpointer_t) index;
+      property_pair_p->header.types[prop_index] = (ecma_property_t) (ECMA_PROPERTY_TYPE_NAMEDDATA
+                                                                     | ECMA_PROPERTY_CONFIGURABLE_ENUMERABLE_WRITABLE
+                                                                     | ECMA_FAST_ARRAY_UINT32_DIRECT_STRING_PROP_TYPE);
+
+      property_pair_p->values[prop_index].value = values_p[index];
+
       index--;
-      continue;
+      prop_index = !prop_index;
     }
 
-    if (prop_index == 1)
+    if (prop_count & 1)
     {
-      property_pair_p = ecma_alloc_property_pair ();
-      property_pair_p->header.next_property_cp = next_property_pair_cp;
       property_pair_p->names_cp[0] = LIT_INTERNAL_MAGIC_STRING_DELETED;
       property_pair_p->header.types[0] = ECMA_PROPERTY_TYPE_DELETED;
-      ECMA_SET_NON_NULL_POINTER (next_property_pair_cp, property_pair_p);
     }
-
-    JERRY_ASSERT (index <= ECMA_DIRECT_STRING_MAX_IMM);
-
-    property_pair_p->names_cp[prop_index] = (jmem_cpointer_t) index;
-    property_pair_p->header.types[prop_index] = (ecma_property_t) (ECMA_PROPERTY_TYPE_NAMEDDATA
-                                                                   | ECMA_PROPERTY_CONFIGURABLE_ENUMERABLE_WRITABLE
-                                                                   | ECMA_FAST_ARRAY_UINT32_DIRECT_STRING_PROP_TYPE);
-
-    property_pair_p->values[prop_index].value = values_p[index];
-
-    index--;
-    prop_index = !prop_index;
   }
 
   ext_obj_p->u.array.u.length_prop = (uint8_t) (ext_obj_p->u.array.u.length_prop & ~ECMA_FAST_ARRAY_FLAG);

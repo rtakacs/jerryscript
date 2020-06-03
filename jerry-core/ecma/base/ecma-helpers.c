@@ -869,8 +869,7 @@ ecma_delete_property (ecma_object_t *object_p, /**< object */
           /* The other property is still valid. */
           if (hashmap_status == ECMA_PROPERTY_HASHMAP_DELETE_RECREATE_HASHMAP)
           {
-            ecma_property_hashmap_free (object_p);
-            ecma_property_hashmap_create (object_p);
+            ecma_property_hashmap_resize (object_p);
           }
 #endif /* ENABLED (JERRY_PROPRETY_HASHMAP) */
           return;
@@ -892,8 +891,7 @@ ecma_delete_property (ecma_object_t *object_p, /**< object */
 #if ENABLED (JERRY_PROPRETY_HASHMAP)
         if (hashmap_status == ECMA_PROPERTY_HASHMAP_DELETE_RECREATE_HASHMAP)
         {
-          ecma_property_hashmap_free (object_p);
-          ecma_property_hashmap_create (object_p);
+          ecma_property_hashmap_resize (object_p);
         }
 #endif /* ENABLED (JERRY_PROPRETY_HASHMAP) */
         return;

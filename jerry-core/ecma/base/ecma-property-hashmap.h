@@ -65,6 +65,7 @@ typedef enum
   ECMA_PROPERTY_HASHMAP_DELETE_RECREATE_HASHMAP, /**< hashmap should be recreated */
 } ecma_property_hashmap_delete_status;
 
+void ecma_property_hashmap_resize (ecma_object_t *object_p);
 void ecma_property_hashmap_create (ecma_object_t *object_p);
 void ecma_property_hashmap_free (ecma_object_t *object_p);
 void ecma_property_hashmap_insert (ecma_object_t *object_p, ecma_string_t *name_p,

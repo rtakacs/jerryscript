@@ -65,6 +65,65 @@ static const uint8_t ecma_property_hashmap_steps[ECMA_PROPERTY_HASHMAP_NUMBER_OF
 #define ECMA_PROPERTY_HASHMAP_SET_BIT(byte_p, index) \
   ((byte_p)[(index) >> 3] = (uint8_t) ((byte_p)[(index) >> 3] | (1 << ((index) & 0x7))))
 
+static
+void insert_into_hashmap (ecma_property_hashmap_t *hashmap_p)
+{
+  jmem_cpointer_t prop_iter_cp = hashmap_p->header.next_property_cp;
+  jmem_cpointer_t *pair_list_p = (jmem_cpointer_t *) (hashmap_p + 1);
+
+  uint8_t *bits_p = (uint8_t *) (pair_list_p + hashmap_p->max_property_count);
+  uint32_t mask = hashmap_p->max_property_count - 1;
+
+  while (prop_iter_cp != JMEM_CP_NULL)
+  {
+    ecma_property_header_t *prop_iter_p = ECMA_GET_NON_NULL_POINTER (ecma_property_header_t, prop_iter_cp);
+    JERRY_ASSERT (ECMA_PROPERTY_IS_PROPERTY_PAIR (prop_iter_p));
+
+    for (int i = 0; i < ECMA_PROPERTY_PAIR_ITEM_COUNT; i++)
+    {
+      if (!ECMA_PROPERTY_IS_NAMED_PROPERTY (prop_iter_p->types[i]))
+      {
+        continue;
+      }
+
+      ecma_property_pair_t *property_pair_p = (ecma_property_pair_t *) prop_iter_p;
+
+      uint32_t entry_index = ecma_string_get_property_name_hash (prop_iter_p->types[i],
+                                                                 property_pair_p->names_cp[i]);
+      uint32_t step = ecma_property_hashmap_steps[entry_index & (ECMA_PROPERTY_HASHMAP_NUMBER_OF_STEPS - 1)];
+
+      entry_index &= mask;
+#ifndef JERRY_NDEBUG
+      /* Because max_property_count (power of 2) and step (a prime
+       * number) are relative primes, all entries of the hasmap are
+       * visited exactly once before the start entry index is reached
+       * again. Furthermore because at least one NULL is present in
+       * the hashmap, the while loop must be terminated before the
+       * the starting index is reached again. */
+      uint32_t start_entry_index = entry_index;
+#endif /* !JERRY_NDEBUG */
+
+      while (pair_list_p[entry_index] != ECMA_NULL_POINTER)
+      {
+        entry_index = (entry_index + step) & mask;
+
+#ifndef JERRY_NDEBUG
+        JERRY_ASSERT (entry_index != start_entry_index);
+#endif /* !JERRY_NDEBUG */
+      }
+
+      ECMA_SET_NON_NULL_POINTER (pair_list_p[entry_index], property_pair_p);
+
+      if (i != 0)
+      {
+        ECMA_PROPERTY_HASHMAP_SET_BIT (bits_p, entry_index);
+      }
+    }
+
+    prop_iter_cp = prop_iter_p->next_property_cp;
+  }
+} /* insert_into_hashmap */
+
 /**
  * Create a new property hashmap for the object.
  * The object must not have a property hashmap.
@@ -134,62 +193,65 @@ ecma_property_hashmap_create (ecma_object_t *object_p) /**< object */
   hashmap_p->null_count = max_property_count - named_property_count;
   hashmap_p->unused_count = max_property_count - named_property_count;
 
-  jmem_cpointer_t *pair_list_p = (jmem_cpointer_t *) (hashmap_p + 1);
-  uint8_t *bits_p = (uint8_t *) (pair_list_p + max_property_count);
-  uint32_t mask = max_property_count - 1;
-
   prop_iter_cp = object_p->u1.property_list_cp;
   ECMA_SET_NON_NULL_POINTER (object_p->u1.property_list_cp, hashmap_p);
 
-  while (prop_iter_cp != JMEM_CP_NULL)
+  insert_into_hashmap (hashmap_p);
+}
+
+/**
+ * Create a new property hashmap for the object.
+ * The object must not have a property hashmap.
+ */
+void
+ecma_property_hashmap_resize (ecma_object_t *object_p) /**< object */
+{
+  if (JERRY_CONTEXT (ecma_prop_hashmap_alloc_state) != ECMA_PROP_HASHMAP_ALLOC_ON)
   {
-    ecma_property_header_t *prop_iter_p = ECMA_GET_NON_NULL_POINTER (ecma_property_header_t, prop_iter_cp);
-    JERRY_ASSERT (ECMA_PROPERTY_IS_PROPERTY_PAIR (prop_iter_p));
-
-    for (int i = 0; i < ECMA_PROPERTY_PAIR_ITEM_COUNT; i++)
-    {
-      if (!ECMA_PROPERTY_IS_NAMED_PROPERTY (prop_iter_p->types[i]))
-      {
-        continue;
-      }
-
-      ecma_property_pair_t *property_pair_p = (ecma_property_pair_t *) prop_iter_p;
-
-      uint32_t entry_index = ecma_string_get_property_name_hash (prop_iter_p->types[i],
-                                                                 property_pair_p->names_cp[i]);
-      uint32_t step = ecma_property_hashmap_steps[entry_index & (ECMA_PROPERTY_HASHMAP_NUMBER_OF_STEPS - 1)];
-
-      entry_index &= mask;
-#ifndef JERRY_NDEBUG
-      /* Because max_property_count (power of 2) and step (a prime
-       * number) are relative primes, all entries of the hasmap are
-       * visited exactly once before the start entry index is reached
-       * again. Furthermore because at least one NULL is present in
-       * the hashmap, the while loop must be terminated before the
-       * the starting index is reached again. */
-      uint32_t start_entry_index = entry_index;
-#endif /* !JERRY_NDEBUG */
-
-      while (pair_list_p[entry_index] != ECMA_NULL_POINTER)
-      {
-        entry_index = (entry_index + step) & mask;
-
-#ifndef JERRY_NDEBUG
-        JERRY_ASSERT (entry_index != start_entry_index);
-#endif /* !JERRY_NDEBUG */
-      }
-
-      ECMA_SET_NON_NULL_POINTER (pair_list_p[entry_index], property_pair_p);
-
-      if (i != 0)
-      {
-        ECMA_PROPERTY_HASHMAP_SET_BIT (bits_p, entry_index);
-      }
-    }
-
-    prop_iter_cp = prop_iter_p->next_property_cp;
+    return;
   }
-} /* ecma_property_hashmap_create */
+
+  ecma_property_hashmap_t *hashmap_p = ECMA_GET_NON_NULL_POINTER (ecma_property_hashmap_t,
+                                                                  object_p->u1.property_list_cp);
+
+  uint32_t named_property_count = hashmap_p->max_property_count - hashmap_p->unused_count;
+
+  if (named_property_count < (ECMA_PROPERTY_HASMAP_MINIMUM_SIZE / 2))
+  {
+    ecma_property_hashmap_free (object_p);
+
+    return;
+  }
+
+  /* The max_property_count must be power of 2. */
+  uint32_t max_property_count = ECMA_PROPERTY_HASMAP_MINIMUM_SIZE;
+
+  /* At least 1/3 items must be NULL. */
+  while (max_property_count < (named_property_count + (named_property_count >> 1)))
+  {
+    max_property_count <<= 1;
+  }
+
+  size_t old_size = ECMA_PROPERTY_HASHMAP_GET_TOTAL_SIZE (hashmap_p->max_property_count);
+  size_t new_size = ECMA_PROPERTY_HASHMAP_GET_TOTAL_SIZE (max_property_count);
+
+  hashmap_p = (ecma_property_hashmap_t *) jmem_heap_realloc_block (hashmap_p, old_size, new_size);
+
+  if (hashmap_p == NULL)
+  {
+    return;
+  }
+
+  memset (hashmap_p + 1, 0, new_size - sizeof (ecma_property_hashmap_t));
+
+  hashmap_p->max_property_count = max_property_count;
+  hashmap_p->null_count = max_property_count - named_property_count;
+  hashmap_p->unused_count = max_property_count - named_property_count;
+
+  ECMA_SET_NON_NULL_POINTER (object_p->u1.property_list_cp, hashmap_p);
+
+  insert_into_hashmap (hashmap_p);
+}
 
 /**
  * Free the hashmap of the object.
@@ -233,8 +295,7 @@ ecma_property_hashmap_insert (ecma_object_t *object_p, /**< object */
   /* The NULLs are reduced below 1/8 of the hashmap. */
   if (hashmap_p->null_count < (hashmap_p->max_property_count >> 3))
   {
-    ecma_property_hashmap_free (object_p);
-    ecma_property_hashmap_create (object_p);
+    ecma_property_hashmap_resize (object_p);
     return;
   }
 

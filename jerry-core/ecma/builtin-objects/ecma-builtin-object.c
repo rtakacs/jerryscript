@@ -14,6 +14,7 @@
  */
 
 #include "ecma-alloc.h"
+#include "ecma-array-object.h"
 #include "ecma-builtin-helpers.h"
 #include "ecma-builtins.h"
 #include "ecma-conversion.h"
@@ -53,9 +54,11 @@ enum
   /* These should be in this order. */
   ECMA_OBJECT_ROUTINE_ASSIGN,
   ECMA_OBJECT_ROUTINE_GET_OWN_PROPERTY_DESCRIPTOR,
+  ECMA_OBJECT_ROUTINE_GET_OWN_PROPERTY_DESCRIPTORS,
   ECMA_OBJECT_ROUTINE_GET_OWN_PROPERTY_NAMES,
   ECMA_OBJECT_ROUTINE_GET_OWN_PROPERTY_SYMBOLS,
   ECMA_OBJECT_ROUTINE_GET_PROTOTYPE_OF,
+  ECMA_OBJECT_ROUTINE_ENTRIES,
   ECMA_OBJECT_ROUTINE_KEYS,
 
   /* These should be in this order. */
@@ -747,6 +750,109 @@ ecma_builtin_object_object_get_own_property_descriptor (ecma_object_t *obj_p, /*
 } /* ecma_builtin_object_object_get_own_property_descriptor */
 
 /**
+ * The Object object's 'entries' routine
+ *
+ * See also:
+ *          ECMA-262 v10, 19.1.2.5
+ *
+ * @return ecma value
+ *         Returned value must be freed with ecma_free_value.
+ */
+ecma_value_t
+ecma_builtin_object_object_entries (ecma_object_t *obj_p) /**< routine's first argument */
+{
+  ecma_collection_t *prop_names_p = ecma_op_object_get_property_names (obj_p, ECMA_LIST_ENUMERABLE);
+  ecma_value_t *names_buffer_p = prop_names_p->buffer_p;
+
+  ecma_value_t length_value = ecma_make_number_value (prop_names_p->item_count);
+  ecma_value_t new_array = ecma_op_create_array_object (&length_value, 1, true);
+
+  ecma_free_value (length_value);
+  JERRY_ASSERT (!ECMA_IS_VALUE_ERROR (new_array));
+
+  ecma_object_t *entries_p = ecma_get_object_from_value (new_array);
+
+  for (uint32_t i = 0; i < prop_names_p->item_count; i++)
+  {
+    if (ecma_is_value_string(names_buffer_p[i]))
+    {
+      ecma_value_t value = ecma_op_object_get (obj_p, ecma_get_string_from_value (names_buffer_p[i]));
+
+      if (ECMA_IS_VALUE_ERROR (value))
+      {
+        ecma_deref_object (entries_p);
+        ecma_collection_free (prop_names_p);
+
+        return ECMA_VALUE_ERROR;
+      }
+
+      ecma_object_t *entry_p = ecma_op_new_fast_array_object (2);
+      ecma_fast_array_set_property (entry_p, 0, names_buffer_p[i]);
+      ecma_fast_array_set_property (entry_p, 1, value);
+
+      ecma_builtin_helper_def_prop_by_index (entries_p, i, ecma_make_object_value(entry_p), ECMA_PROP_NO_OPTS);
+
+      ecma_free_value (value);
+      ecma_deref_object (entry_p);
+    }
+  }
+
+  ecma_collection_free (prop_names_p);
+
+  return ecma_make_object_value (entries_p);
+}
+
+/**
+ * The Object object's 'getOwnPropertyDescriptors' routine
+ *
+ * See also:
+ *          ECMA-262 v10, 19.1.2.9
+ *
+ * @return ecma value
+ *         Returned value must be freed with ecma_free_value.
+ */
+ecma_value_t
+ecma_builtin_object_object_get_own_property_descriptors (ecma_object_t *obj_p) /**< routine's first argument */
+{
+  /* 2 */
+  ecma_collection_t *prop_names_p = ecma_op_object_get_property_names (obj_p, ECMA_LIST_NO_OPTS);
+  ecma_value_t *names_buffer_p = prop_names_p->buffer_p;
+
+  /* 3 */
+  ecma_object_t *object_prototype_p = ecma_builtin_get (ECMA_BUILTIN_ID_OBJECT_PROTOTYPE);
+  ecma_object_t *descriptors_p = ecma_create_object (object_prototype_p, 0, ECMA_OBJECT_TYPE_GENERAL);
+
+  /* 4 */
+  for (uint32_t i = 0; i < prop_names_p->item_count; i++)
+  {
+    ecma_string_t *property_name_p = ecma_get_string_from_value (names_buffer_p[i]);
+
+    /* 4.a */
+    ecma_property_descriptor_t prop_desc;
+    ecma_value_t status = ecma_op_object_get_own_property_descriptor (obj_p, property_name_p, &prop_desc);
+
+    if (ecma_is_value_true (status))
+    {
+      /* 4.b */
+      ecma_object_t *desc_obj_p = ecma_op_from_property_descriptor (&prop_desc);
+      /* 4.c */
+      ecma_property_value_t *value_p = ecma_create_named_data_property (descriptors_p,
+                                                                        property_name_p,
+                                                                        ECMA_PROPERTY_CONFIGURABLE_ENUMERABLE_WRITABLE,
+                                                                        NULL);
+      value_p->value = ecma_make_object_value (desc_obj_p);
+      ecma_deref_object (desc_obj_p);
+    }
+
+    ecma_free_property_descriptor (&prop_desc);
+  }
+
+  ecma_collection_free (prop_names_p);
+
+  return ecma_make_object_value (descriptors_p);
+} /* ecma_builtin_object_object_get_own_property_descriptors */
+
+/**
  * The Object object's 'defineProperties' routine
  *
  * See also:
@@ -1194,6 +1300,11 @@ ecma_builtin_object_dispatch_routine (uint16_t builtin_routine_id, /**< built-in
         break;
       }
 #endif /* ENABLED (JERRY_ES2015) */
+      case ECMA_OBJECT_ROUTINE_ENTRIES:
+      {
+        result = ecma_builtin_object_object_entries (obj_p);
+        break;
+      }
       case ECMA_OBJECT_ROUTINE_KEYS:
       {
         result = ecma_builtin_object_object_keys (obj_p);
@@ -1211,6 +1322,11 @@ ecma_builtin_object_dispatch_routine (uint16_t builtin_routine_id, /**< built-in
 
         result = ecma_builtin_object_object_get_own_property_descriptor (obj_p, prop_name_p);
         ecma_deref_ecma_string (prop_name_p);
+        break;
+      }
+      case ECMA_OBJECT_ROUTINE_GET_OWN_PROPERTY_DESCRIPTORS:
+      {
+        result = ecma_builtin_object_object_get_own_property_descriptors (obj_p);
         break;
       }
       default:

@@ -14,6 +14,7 @@
  */
 
 #include "ecma-alloc.h"
+#include "ecma-array-object.h"
 #include "ecma-builtin-helpers.h"
 #include "ecma-builtins.h"
 #include "ecma-conversion.h"
@@ -57,6 +58,8 @@ enum
   ECMA_OBJECT_ROUTINE_GET_OWN_PROPERTY_NAMES,
   ECMA_OBJECT_ROUTINE_GET_OWN_PROPERTY_SYMBOLS,
   ECMA_OBJECT_ROUTINE_GET_PROTOTYPE_OF,
+  ECMA_OBJECT_ROUTINE_ENTRIES,
+  ECMA_OBJECT_ROUTINE_VALUES,
   ECMA_OBJECT_ROUTINE_KEYS,
 
   /* These should be in this order. */
@@ -694,11 +697,69 @@ ecma_builtin_object_object_is_extensible (ecma_object_t *obj_p) /**< routine's a
   return ecma_make_boolean_value (ecma_op_ordinary_object_is_extensible (obj_p));
 } /* ecma_builtin_object_object_is_extensible */
 
+#if ENABLED (JERRY_ESNEXT)
+/**
+ * The Object object's 'entries' routine
+ *
+ * See also:
+ *          ECMA-262 v11, 19.1.2.5
+ *
+ * @return ecma value
+ *         Returned value must be freed with ecma_free_value.
+ */
+static ecma_value_t
+ecma_builtin_object_object_entries (ecma_object_t *obj_p) /**< routine's first argument */
+{
+  /* 2. */
+  ecma_collection_t *props_p = ecma_op_object_get_enumerable_property_names (obj_p,
+                                                                             ECMA_ENUMERABLE_PROPERTY_KEYS_VALUES);
+  if (props_p == NULL)
+  {
+    return ECMA_VALUE_ERROR;
+  }
+
+  ecma_value_t *names_buffer_p = props_p->buffer_p;
+  /* 3. */
+  ecma_value_t array_value = ecma_op_create_array_object (names_buffer_p, props_p->item_count, false);
+  ecma_collection_free (props_p);
+
+  return array_value;
+} /* ecma_builtin_object_object_entries */
+
+/**
+ * The Object object's 'values' routine
+ *
+ * See also:
+ *          ECMA-262 v11, 19.1.2.22
+ *
+ * @return ecma value
+ *         Returned value must be freed with ecma_free_value.
+ */
+static ecma_value_t
+ecma_builtin_object_object_values (ecma_object_t *obj_p) /**< routine's first argument */
+{
+  /* 2. */
+  ecma_collection_t *props_p = ecma_op_object_get_enumerable_property_names (obj_p,
+                                                                             ECMA_ENUMERABLE_PROPERTY_VALUES);
+  if (props_p == NULL)
+  {
+    return ECMA_VALUE_ERROR;
+  }
+
+  ecma_value_t *names_buffer_p = props_p->buffer_p;
+  /* 3. */
+  ecma_value_t array_value = ecma_op_create_array_object (names_buffer_p, props_p->item_count, false);
+  ecma_collection_free (props_p);
+
+  return array_value;
+} /* ecma_builtin_object_object_values */
+#endif /* ENABLED (JERRY_ESNEXT) */
+
 /**
  * The Object object's 'keys' routine
  *
  * See also:
- *          ECMA-262 v5, 15.2.3.14
+ *          ECMA-262 v11, 19.1.2.17
  *
  * @return ecma value
  *         Returned value must be freed with ecma_free_value.
@@ -706,7 +767,20 @@ ecma_builtin_object_object_is_extensible (ecma_object_t *obj_p) /**< routine's a
 static ecma_value_t
 ecma_builtin_object_object_keys (ecma_object_t *obj_p) /**< routine's argument */
 {
-  return ecma_builtin_helper_object_get_properties (obj_p, ECMA_LIST_ENUMERABLE);
+  /* 2. */
+  ecma_collection_t *props_p = ecma_op_object_get_enumerable_property_names (obj_p,
+                                                                             ECMA_ENUMERABLE_PROPERTY_KEYS);
+  if (props_p == NULL)
+  {
+    return ECMA_VALUE_ERROR;
+  }
+
+  ecma_value_t *names_buffer_p = props_p->buffer_p;
+  /* 3. */
+  ecma_value_t array_value = ecma_op_create_array_object (names_buffer_p, props_p->item_count, false);
+  ecma_collection_free (props_p);
+
+  return array_value;
 } /* ecma_builtin_object_object_keys */
 
 /**
@@ -1264,6 +1338,16 @@ ecma_builtin_object_dispatch_routine (uint16_t builtin_routine_id, /**< built-in
       case ECMA_OBJECT_ROUTINE_GET_OWN_PROPERTY_SYMBOLS:
       {
         result = ecma_builtin_object_object_get_own_property_symbols (obj_p);
+        break;
+      }
+      case ECMA_OBJECT_ROUTINE_ENTRIES:
+      {
+        result = ecma_builtin_object_object_entries (obj_p);
+        break;
+      }
+      case ECMA_OBJECT_ROUTINE_VALUES:
+      {
+        result = ecma_builtin_object_object_values (obj_p);
         break;
       }
 #endif /* ENABLED (JERRY_ESNEXT) */

@@ -358,6 +358,16 @@ typedef enum
 } ecma_list_properties_options_t;
 
 /**
+ * Enumerable property name listing options.
+ */
+typedef enum
+{
+  ECMA_ENUMERABLE_PROPERTY_KEYS, /**< list only property names */
+  ECMA_ENUMERABLE_PROPERTY_VALUES, /**< list only property values */
+  ECMA_ENUMERABLE_PROPERTY_KEYS_VALUES /**< list both propery names and values */
+} ecma_enumerable_property_names_options_t;
+
+/**
  * List enumerable properties and include the prototype chain.
  */
 #define ECMA_LIST_ENUMERABLE_PROTOTYPE (ECMA_LIST_ENUMERABLE | ECMA_LIST_PROTOTYPE)

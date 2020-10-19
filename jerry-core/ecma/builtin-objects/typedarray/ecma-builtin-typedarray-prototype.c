@@ -1745,124 +1745,129 @@ ecma_builtin_typedarray_prototype_dispatch_routine (uint16_t builtin_routine_id,
   }
 
   ecma_object_t *typedarray_p = ecma_get_object_from_value (this_arg);
-  ecma_typedarray_info_t info;
-
-  if (builtin_routine_id < ECMA_TYPEDARRAY_PROTOTYPE_ROUTINE_BUFFER_GETTER)
-  {
-    info = ecma_typedarray_get_info (typedarray_p);
-
-    if (ecma_arraybuffer_is_detached (info.array_buffer_p)
-        && builtin_routine_id != ECMA_TYPEDARRAY_PROTOTYPE_ROUTINE_SUBARRAY)
-    {
-      return ecma_raise_type_error (ECMA_ERR_MSG ("ArrayBuffer has been detached."));
-    }
-  }
 
   if (builtin_routine_id < ECMA_TYPEDARRAY_PROTOTYPE_ROUTINE_INDEX_OF && !ecma_op_is_callable (arguments_list_p[0]))
   {
     return ecma_raise_type_error (ECMA_ERR_MSG ("Callback function is not callable."));
   }
 
+  if (builtin_routine_id < ECMA_TYPEDARRAY_PROTOTYPE_ROUTINE_JOIN)
+  {
+    ecma_typedarray_info_t info = ecma_typedarray_get_info (typedarray_p);
+
+    if (ecma_arraybuffer_is_detached (info.array_buffer_p)
+        && builtin_routine_id != ECMA_TYPEDARRAY_PROTOTYPE_ROUTINE_SUBARRAY)
+    {
+      return ecma_raise_type_error (ECMA_ERR_MSG ("ArrayBuffer has been detached."));
+    }
+
+    switch (builtin_routine_id)
+    {
+      case ECMA_TYPEDARRAY_PROTOTYPE_ROUTINE_INCLUDES:
+      {
+        return ecma_builtin_typedarray_prototype_includes (&info, arguments_list_p, arguments_number);
+      }
+      case ECMA_TYPEDARRAY_PROTOTYPE_ROUTINE_EVERY:
+      case ECMA_TYPEDARRAY_PROTOTYPE_ROUTINE_SOME:
+      case ECMA_TYPEDARRAY_PROTOTYPE_ROUTINE_FOR_EACH:
+      {
+        uint8_t offset = (uint8_t) (builtin_routine_id - ECMA_TYPEDARRAY_PROTOTYPE_ROUTINE_EVERY);
+
+        return ecma_builtin_typedarray_prototype_exec_routine (this_arg,
+                                                               &info,
+                                                               arguments_list_p[0],
+                                                               arguments_list_p[1],
+                                                               offset);
+      }
+      case ECMA_TYPEDARRAY_PROTOTYPE_ROUTINE_MAP:
+      {
+        return ecma_builtin_typedarray_prototype_map (this_arg, &info, arguments_list_p[0], arguments_list_p[1]);
+      }
+      case ECMA_TYPEDARRAY_PROTOTYPE_ROUTINE_REDUCE:
+      case ECMA_TYPEDARRAY_PROTOTYPE_ROUTINE_REDUCE_RIGHT:
+      {
+        bool is_reduce =  builtin_routine_id == ECMA_TYPEDARRAY_PROTOTYPE_ROUTINE_REDUCE_RIGHT;
+        return ecma_builtin_typedarray_prototype_reduce_with_direction (this_arg,
+                                                                        &info,
+                                                                        arguments_list_p[0],
+                                                                        arguments_list_p[1],
+                                                                        is_reduce);
+      }
+      case ECMA_TYPEDARRAY_PROTOTYPE_ROUTINE_FILTER:
+      {
+        return ecma_builtin_typedarray_prototype_filter (this_arg, &info, arguments_list_p[0], arguments_list_p[1]);
+
+      }
+      case ECMA_TYPEDARRAY_PROTOTYPE_ROUTINE_REVERSE:
+      {
+        return ecma_builtin_typedarray_prototype_reverse (this_arg, &info);
+      }
+      case ECMA_TYPEDARRAY_PROTOTYPE_ROUTINE_SET:
+      {
+        return ecma_builtin_typedarray_prototype_set (this_arg, arguments_list_p[0], arguments_list_p[1]);
+      }
+      case ECMA_TYPEDARRAY_PROTOTYPE_ROUTINE_SUBARRAY:
+      {
+        return ecma_builtin_typedarray_prototype_subarray (&info, arguments_list_p[0], arguments_list_p[1]);
+      }
+      case ECMA_TYPEDARRAY_PROTOTYPE_ROUTINE_FILL:
+      {
+        return ecma_builtin_typedarray_prototype_fill (this_arg,
+                                                       &info,
+                                                       arguments_list_p[0],
+                                                       arguments_list_p[1],
+                                                       arguments_list_p[2]);
+      }
+      case ECMA_TYPEDARRAY_PROTOTYPE_ROUTINE_SORT:
+      {
+        if (!ecma_is_value_undefined (arguments_list_p[0]) && !ecma_op_is_callable (arguments_list_p[0]))
+        {
+          return ecma_raise_type_error (ECMA_ERR_MSG ("Callback function is not callable."));
+        }
+
+        return ecma_builtin_typedarray_prototype_sort (this_arg, &info, arguments_list_p[0]);
+
+      }
+      case ECMA_TYPEDARRAY_PROTOTYPE_ROUTINE_FIND:
+      case ECMA_TYPEDARRAY_PROTOTYPE_ROUTINE_FIND_INDEX:
+      {
+        bool is_find = builtin_routine_id == ECMA_TYPEDARRAY_PROTOTYPE_ROUTINE_FIND;
+        return ecma_builtin_typedarray_prototype_find_helper (this_arg,
+                                                              &info,
+                                                              arguments_list_p[0],
+                                                              arguments_list_p[1],
+                                                              is_find);
+      }
+      case ECMA_TYPEDARRAY_PROTOTYPE_ROUTINE_INDEX_OF:
+      {
+        return ecma_builtin_typedarray_prototype_index_of (&info, arguments_list_p, arguments_number);
+      }
+      case ECMA_TYPEDARRAY_PROTOTYPE_ROUTINE_LAST_INDEX_OF:
+      {
+        return ecma_builtin_typedarray_prototype_last_index_of (&info, arguments_list_p, arguments_number);
+      }
+      case ECMA_TYPEDARRAY_PROTOTYPE_ROUTINE_COPY_WITHIN:
+      {
+        return ecma_builtin_typedarray_prototype_copy_within (this_arg, &info, arguments_list_p, arguments_number);
+      }
+      case ECMA_TYPEDARRAY_PROTOTYPE_ROUTINE_SLICE:
+      {
+        return ecma_builtin_typedarray_prototype_slice (&info, arguments_list_p, arguments_number);
+      }
+      case ECMA_TYPEDARRAY_PROTOTYPE_ROUTINE_TO_LOCALE_STRING:
+      {
+        return ecma_builtin_typedarray_prototype_to_locale_string (&info);
+      }
+    }
+
+    JERRY_UNREACHABLE();
+  }
+
   switch (builtin_routine_id)
   {
-    case ECMA_TYPEDARRAY_PROTOTYPE_ROUTINE_INCLUDES:
-    {
-      return ecma_builtin_typedarray_prototype_includes (&info, arguments_list_p, arguments_number);
-    }
     case ECMA_TYPEDARRAY_PROTOTYPE_ROUTINE_JOIN:
     {
       return ecma_builtin_typedarray_prototype_join (typedarray_p, arguments_list_p[0]);
-    }
-    case ECMA_TYPEDARRAY_PROTOTYPE_ROUTINE_EVERY:
-    case ECMA_TYPEDARRAY_PROTOTYPE_ROUTINE_SOME:
-    case ECMA_TYPEDARRAY_PROTOTYPE_ROUTINE_FOR_EACH:
-    {
-      uint8_t offset = (uint8_t) (builtin_routine_id - ECMA_TYPEDARRAY_PROTOTYPE_ROUTINE_EVERY);
-
-      return ecma_builtin_typedarray_prototype_exec_routine (this_arg,
-                                                             &info,
-                                                             arguments_list_p[0],
-                                                             arguments_list_p[1],
-                                                             offset);
-    }
-    case ECMA_TYPEDARRAY_PROTOTYPE_ROUTINE_MAP:
-    {
-      return ecma_builtin_typedarray_prototype_map (this_arg, &info, arguments_list_p[0], arguments_list_p[1]);
-    }
-    case ECMA_TYPEDARRAY_PROTOTYPE_ROUTINE_REDUCE:
-    case ECMA_TYPEDARRAY_PROTOTYPE_ROUTINE_REDUCE_RIGHT:
-    {
-      bool is_reduce =  builtin_routine_id == ECMA_TYPEDARRAY_PROTOTYPE_ROUTINE_REDUCE_RIGHT;
-      return ecma_builtin_typedarray_prototype_reduce_with_direction (this_arg,
-                                                                      &info,
-                                                                      arguments_list_p[0],
-                                                                      arguments_list_p[1],
-                                                                      is_reduce);
-    }
-    case ECMA_TYPEDARRAY_PROTOTYPE_ROUTINE_FILTER:
-    {
-      return ecma_builtin_typedarray_prototype_filter (this_arg, &info, arguments_list_p[0], arguments_list_p[1]);
-
-    }
-    case ECMA_TYPEDARRAY_PROTOTYPE_ROUTINE_REVERSE:
-    {
-      return ecma_builtin_typedarray_prototype_reverse (this_arg, &info);
-    }
-    case ECMA_TYPEDARRAY_PROTOTYPE_ROUTINE_SET:
-    {
-      return ecma_builtin_typedarray_prototype_set (this_arg, arguments_list_p[0], arguments_list_p[1]);
-    }
-    case ECMA_TYPEDARRAY_PROTOTYPE_ROUTINE_SUBARRAY:
-    {
-      return ecma_builtin_typedarray_prototype_subarray (&info, arguments_list_p[0], arguments_list_p[1]);
-    }
-    case ECMA_TYPEDARRAY_PROTOTYPE_ROUTINE_FILL:
-    {
-      return ecma_builtin_typedarray_prototype_fill (this_arg,
-                                                     &info,
-                                                     arguments_list_p[0],
-                                                     arguments_list_p[1],
-                                                     arguments_list_p[2]);
-    }
-    case ECMA_TYPEDARRAY_PROTOTYPE_ROUTINE_SORT:
-    {
-      if (!ecma_is_value_undefined (arguments_list_p[0]) && !ecma_op_is_callable (arguments_list_p[0]))
-      {
-        return ecma_raise_type_error (ECMA_ERR_MSG ("Callback function is not callable."));
-      }
-
-      return ecma_builtin_typedarray_prototype_sort (this_arg, &info, arguments_list_p[0]);
-
-    }
-    case ECMA_TYPEDARRAY_PROTOTYPE_ROUTINE_FIND:
-    case ECMA_TYPEDARRAY_PROTOTYPE_ROUTINE_FIND_INDEX:
-    {
-      bool is_find = builtin_routine_id == ECMA_TYPEDARRAY_PROTOTYPE_ROUTINE_FIND;
-      return ecma_builtin_typedarray_prototype_find_helper (this_arg,
-                                                            &info,
-                                                            arguments_list_p[0],
-                                                            arguments_list_p[1],
-                                                            is_find);
-    }
-    case ECMA_TYPEDARRAY_PROTOTYPE_ROUTINE_INDEX_OF:
-    {
-      return ecma_builtin_typedarray_prototype_index_of (&info, arguments_list_p, arguments_number);
-    }
-    case ECMA_TYPEDARRAY_PROTOTYPE_ROUTINE_LAST_INDEX_OF:
-    {
-      return ecma_builtin_typedarray_prototype_last_index_of (&info, arguments_list_p, arguments_number);
-    }
-    case ECMA_TYPEDARRAY_PROTOTYPE_ROUTINE_COPY_WITHIN:
-    {
-      return ecma_builtin_typedarray_prototype_copy_within (this_arg, &info, arguments_list_p, arguments_number);
-    }
-    case ECMA_TYPEDARRAY_PROTOTYPE_ROUTINE_SLICE:
-    {
-      return ecma_builtin_typedarray_prototype_slice (&info, arguments_list_p, arguments_number);
-    }
-    case ECMA_TYPEDARRAY_PROTOTYPE_ROUTINE_TO_LOCALE_STRING:
-    {
-      return ecma_builtin_typedarray_prototype_to_locale_string (&info);
     }
     case ECMA_TYPEDARRAY_PROTOTYPE_ROUTINE_KEYS:
     case ECMA_TYPEDARRAY_PROTOTYPE_ROUTINE_ENTRIES:
@@ -1898,11 +1903,9 @@ ecma_builtin_typedarray_prototype_dispatch_routine (uint16_t builtin_routine_id,
       ecma_extended_object_t *obj_p = (ecma_extended_object_t *) typedarray_p;
       return ecma_make_magic_string_value (obj_p->u.pseudo_array.u1.class_id);
     }
-    default:
-    {
-      JERRY_UNREACHABLE ();
-    }
   }
+
+  JERRY_UNREACHABLE();
 } /* ecma_builtin_typedarray_prototype_dispatch_routine */
 
 /**

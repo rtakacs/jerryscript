@@ -33,7 +33,7 @@ install-xtensa-esp32-gcc:
 # Fetch Espressif IoT Development Framework and install its dependencies.
 install-esp-idf:
 	git clone https://github.com/espressif/esp-idf.git ../esp-idf -b release/v4.4
-	IDF_TOOLS_PATH=$(CURDIR)/../idf_tools $(CURDIR)/../esp-idf/install.sh esp32
+	IDF_TOOLS_PATH=$(CURDIR)/.. $(CURDIR)/../esp-idf/install.sh esp32
 
 # Perform all the necessary (JerryScript-independent) installation steps.
 install-noapt: install-xtensa-esp32-gcc install-esp-idf
@@ -44,7 +44,7 @@ install: install-apt-get-deps install-noapt
 
 # Build the firmware (ESP-IDF with JerryScript).
 script:
-	PATH=$(CURDIR)/../idf_tools/xtensa-esp32-elf/bin:$PATH ${pythonLocation}/python $(CURDIR)/../esp-idf/tools/idf.py \
+	PATH=$(CURDIR)/../tools:$(CURDIR)/../tools/xtensa-esp32-elf/esp-2021r2-8.4.0/bin:$PATH ${pythonLocation}/python $(CURDIR)/../esp-idf/tools/idf.py \
 		--project-dir ./targets/baremetal-sdk/espressif \
 		--build-dir ./build/esp-idf \
 		set-target esp32 \

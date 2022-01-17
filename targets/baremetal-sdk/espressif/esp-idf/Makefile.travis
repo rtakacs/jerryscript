@@ -44,7 +44,10 @@ install: install-apt-get-deps install-noapt
 
 # Build the firmware (ESP-IDF with JerryScript).
 script:
-	PATH=$(CURDIR)/../tools:$(CURDIR)/../tools/xtensa-esp32-elf/esp-2021r2-8.4.0/bin:$PATH ${pythonLocation}/python $(CURDIR)/../esp-idf/tools/idf.py \
+	ls $(CURDIR)/../tools
+	PYTHONPATH=$(CURDIR)/../tools \
+	PATH=$(CURDIR)/../tools:$(CURDIR)/../tools/xtensa-esp32-elf/esp-2021r2-8.4.0/bin:$PATH \
+	${pythonLocation}/python $(CURDIR)/../esp-idf/tools/idf.py \
 		--project-dir ./targets/baremetal-sdk/espressif \
 		--build-dir ./build/esp-idf \
 		set-target esp32 \

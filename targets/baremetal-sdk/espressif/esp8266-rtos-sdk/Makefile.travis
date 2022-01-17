@@ -35,7 +35,7 @@ install-espressif-sdk:
 	git clone https://github.com/espressif/ESP8266_RTOS_SDK.git ../ESP8266_RTOS_SDK -b release/v3.4
 	${pythonLocation}/python -m pip install --user -r $(CURDIR)/../ESP8266_RTOS_SDK/requirements.txt
 
-# Perform all the necessary (JerryScript-independent) installation steps.
+# Perform all the necessary (JerryScript-independent) installation steps. - edited -
 install-noapt: install-xtensa-lx106-gcc install-espressif-sdk
 install: install-apt-get-deps install-noapt
 
